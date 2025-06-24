@@ -5,22 +5,35 @@ import storage from '@react-native-firebase/storage';
 import functions from '@react-native-firebase/functions';
 import { firebaseConfig } from './config';
 
-// Initialize Firebase if it hasn't been initialized yet
-if (!firebase.apps.length) {
-  firebase.initializeApp({
-    apiKey: firebaseConfig.apiKey,
-    projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket,
-    messagingSenderId: firebaseConfig.messagingSenderId,
-    appId: firebaseConfig.appId,
-    databaseURL: firebaseConfig.databaseURL
-  });
+/**
+ * Initialize Firebase if it hasn't been initialized yet
+ */
+export function initializeFirebase() {
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    return firebase.app();
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+    throw error;
+  }
 }
 
-// Get Firebase service instances
-const app = firebase.app();
+// Initialize Firebase
+const app = initializeFirebase();
+
+// Initialize services
 const db = firestore();
 const storageInstance = storage();
 const functionsInstance = functions();
+const authInstance = auth();
 
-export { app, auth, db as firestore, storageInstance as storage, functionsInstance as functions }; 
+// Export initialized instances
+export { 
+  app,
+  authInstance as auth,
+  db as firestore,
+  storageInstance as storage,
+  functionsInstance as functions
+}; 
