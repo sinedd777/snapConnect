@@ -21,6 +21,7 @@
     "expo": "~50.0.11",
     "expo-constants": "~15.4.5",
     "expo-dev-client": "~3.3.9",
+    "expo-image-picker": "^16.1.4",
     "expo-splash-screen": "~0.26.4",
     "expo-status-bar": "~1.11.1",
     "expo-system-ui": "~2.9.3",
