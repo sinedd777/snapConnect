@@ -1,37 +1,65 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { initializeFirebase } from './src/services/firebase/init';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { SignInScreen } from './src/screens/auth/SignInScreen';
+import { SignUpScreen } from './src/screens/auth/SignUpScreen';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { RootStackParamList } from './src/navigation/types';
 
-export default function App() {
-  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
-  const [initializing, setInitializing] = useState(true);
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-  useEffect(() => {
-    // Initialize Firebase
-    initializeFirebase();
+function MainScreen() {
+  const { signOut } = useAuth();
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Welcome to SnapConnect!</Text>
+      <Text style={{ color: 'blue', marginTop: 10 }} onPress={signOut}>
+        Sign Out
+      </Text>
+    </View>
+  );
+}
 
-    // Set up auth state listener
-    const subscriber = auth().onAuthStateChanged((user) => {
-      setUser(user);
-      if (initializing) setInitializing(false);
-    });
+function Navigation() {
+  const { user, loading } = useAuth();
 
-    return subscriber; // unsubscribe on unmount
-  }, [initializing]);
-
-  if (initializing) {
+  if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Welcome to SnapConnect!</Text>
-      <Text>{user ? `Logged in as: ${user.email}` : 'Not logged in'}</Text>
-    </View>
+    <Stack.Navigator>
+      {user ? (
+        <Stack.Screen name="Main" component={MainScreen} />
+      ) : (
+        <>
+          <Stack.Screen 
+            name="SignIn" 
+            component={SignInScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="SignUp" 
+            component={SignUpScreen}
+            options={{ headerShown: false }}
+          />
+        </>
+      )}
+    </Stack.Navigator>
+  );
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>
+    </NavigationContainer>
   );
 }

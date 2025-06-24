@@ -21,13 +21,17 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.sinedd.snapconnect",
-      "edgeToEdgeEnabled": true
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "@react-native-google-signin/google-signin",
       "expo-web-browser"
-    ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.sinedd.snapconnect"
+    }
   }
 }
