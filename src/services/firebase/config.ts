@@ -1,19 +1,25 @@
 import firebase from '@react-native-firebase/app';
+import {
+  FIREBASE_API_KEY,
+  FIREBASE_PROJECT_ID,
+  FIREBASE_STORAGE_BUCKET,
+  FIREBASE_MESSAGING_SENDER_ID,
+  FIREBASE_APP_ID,
+} from '@env';
 
 /**
  * Firebase configuration object
- * These values are available in your Firebase Console -> Project Settings -> General
- * For security, these should be stored in environment variables in production
+ * These values are loaded from environment variables for security
  */
 export const firebaseConfig = {
   // Your web app's Firebase configuration
   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  apiKey: "AIzaSyBlgNFf34qoz4c9oadLWMT3qu2hANpUEzQ",
-  projectId: "snapconnect-app",
-  storageBucket: "snapconnect-app.firebasestorage.app",
-  messagingSenderId: "272057868675",
-  appId: "1:272057868675:android:e91c836c0c66e8dc37d6b6",
-  databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
+  apiKey: FIREBASE_API_KEY,
+  projectId: FIREBASE_PROJECT_ID,
+  storageBucket: FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: FIREBASE_MESSAGING_SENDER_ID,
+  appId: FIREBASE_APP_ID,
+  databaseURL: `https://${FIREBASE_PROJECT_ID}.firebaseio.com`
 } as const;
 
 /**
