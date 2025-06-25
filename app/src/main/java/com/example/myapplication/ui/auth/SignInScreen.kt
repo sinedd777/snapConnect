@@ -52,12 +52,6 @@ fun SignInScreen(
         }
         Spacer(modifier = Modifier.height(8.dp))
 
-        Button(
-            onClick = onGoogleSignInClicked,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Sign in with Google")
-        }
         Spacer(modifier = Modifier.height(8.dp))
 
         TextButton(onClick = onNavigateToSignUp) {
