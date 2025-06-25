@@ -67,7 +67,7 @@ val googleServicesJson = """
   "project_info": {
     "project_number": "${localProperties.getProperty("FIREBASE_MESSAGING_SENDER_ID")}",
     "project_id": "${localProperties.getProperty("FIREBASE_PROJECT_ID")}",
-    "storage_bucket": "${localProperties.getProperty("FIREBASE_PROJECT_ID")}.appspot.com"
+    "storage_bucket": "${localProperties.getProperty("FIREBASE_PROJECT_ID")}.firebasestorage.app"
   },
   "client": [
     {
@@ -110,6 +110,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.storage.ktx)
     implementation(libs.google.id)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

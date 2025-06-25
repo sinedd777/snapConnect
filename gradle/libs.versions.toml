@@ -19,6 +19,7 @@ accompanistPermissions = "0.34.0"
 firebaseFirestoreKtx = "25.1.4"
 concurrentFutures = "1.1.0"
 guava = "31.1-android"
+firebaseStorageKtx = "20.3.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,6 +51,7 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 google-firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestoreKtx" }
 androidx-concurrent-futures-ktx = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version.ref = "concurrentFutures" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

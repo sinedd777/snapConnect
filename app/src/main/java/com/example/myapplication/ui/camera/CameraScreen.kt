@@ -29,6 +29,7 @@ import com.google.accompanist.permissions.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.launch
 
 @OptIn(com.google.accompanist.permissions.ExperimentalPermissionsApi::class)
 @Composable
@@ -40,7 +41,8 @@ fun CameraScreen(
     val lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current
 
     val imageCapture = remember { ImageCapture.Builder().build() }
-
+    val snapRepo = remember { com.example.myapplication.data.repositories.SnapRepository() }
+    val scope = rememberCoroutineScope()
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     var hasPermission by rememberSaveable { mutableStateOf(false) }
@@ -114,7 +116,15 @@ fun CameraScreen(
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
                             Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
-                            onSnapCaptured(savedUri)
+                            scope.launch {
+                                val result = snapRepo.uploadSnap(savedUri)
+                                if (result.isSuccess) {
+                                    Toast.makeText(context, "Snap uploaded", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Upload failed", Toast.LENGTH_SHORT).show()
+                                }
+                                onSnapCaptured(savedUri)
+                            }
                         }
                     }
                 )
