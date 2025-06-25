@@ -1,0 +1,32 @@
+// Firestore console → Rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // User docs
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+    
+    // Snap docs
+    match /snaps/{snapId} {
+      allow read: if request.auth != null && 
+                   (resource.data.sender == request.auth.uid || 
+                    request.auth.uid in resource.data.recipients);
+      allow create: if request.auth != null && 
+                     request.resource.data.sender == request.auth.uid;
+      allow update: if request.auth != null && 
+                     (resource.data.sender == request.auth.uid || 
+                      request.auth.uid in resource.data.recipients);
+    }
+    
+    // Friendship docs
+    match /friendships/{friendshipId} {
+      allow read, write: if request.auth != null && 
+                          (request.auth.uid == resource.data.userA || 
+                           request.auth.uid == resource.data.userB);
+      allow create: if request.auth != null && 
+                     request.resource.data.userA == request.auth.uid;
+    }
+  }
+}

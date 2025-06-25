@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,9 @@ fun CameraScreen(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     var hasPermission by rememberSaveable { mutableStateOf(false) }
+    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showRecipientSelector by remember { mutableStateOf(false) }
+    var isUploading by remember { mutableStateOf(false) }
 
     // Request camera permission
     if (!hasPermission) {
@@ -67,6 +71,30 @@ fun CameraScreen(
         ) {
             Text("Camera permission required")
         }
+        return
+    }
+
+    if (showRecipientSelector && capturedImageUri != null) {
+        RecipientSelectorScreen(
+            onBack = { showRecipientSelector = false },
+            onSendToRecipients = { recipients ->
+                isUploading = true
+                scope.launch {
+                    val result = snapRepo.uploadSnap(capturedImageUri!!, recipients)
+                    isUploading = false
+                    result.fold(
+                        onSuccess = { 
+                            Toast.makeText(context, "Snap sent!", Toast.LENGTH_SHORT).show()
+                            onSnapCaptured(capturedImageUri)
+                        },
+                        onFailure = { e ->
+                            Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            showRecipientSelector = false
+                        }
+                    )
+                }
+            }
+        )
         return
     }
 
@@ -93,6 +121,17 @@ fun CameraScreen(
             }
         }
 
+        // Close button
+        FloatingActionButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Close")
+        }
+
+        // Capture button
         FloatingActionButton(
             onClick = {
                 val photoFile = File(
@@ -108,7 +147,7 @@ fun CameraScreen(
                     ContextCompat.getMainExecutor(context),
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onError(exception: ImageCaptureException) {
-                            Log.e("CameraScreen", "Photo capture failed: ${'$'}exception")
+                            Log.e("CameraScreen", "Photo capture failed: $exception")
                             Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
                             onSnapCaptured(null)
                         }
@@ -116,15 +155,8 @@ fun CameraScreen(
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
                             Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
-                            scope.launch {
-                                val result = snapRepo.uploadSnap(savedUri)
-                                if (result.isSuccess) {
-                                    Toast.makeText(context, "Snap uploaded", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Upload failed", Toast.LENGTH_SHORT).show()
-                                }
-                                onSnapCaptured(savedUri)
-                            }
+                            capturedImageUri = savedUri
+                            showRecipientSelector = true
                         }
                     }
                 )

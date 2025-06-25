@@ -129,6 +129,7 @@ dependencies {
     implementation(libs.androidx.concurrent.futures.ktx)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.guava)
+    implementation(libs.coil.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -132,3 +132,4 @@ GoogleService-Info.plist
 .env.*
 !.env.example
 
+*.txt
