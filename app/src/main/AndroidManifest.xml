@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Declare that the app doesn't require camera hardware to function -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    
+    <!-- AR related permissions and features -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -17,6 +21,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication"
         tools:targetApi="31">
+        
+        <!-- AR required metadata -->
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
+            
         <activity
             android:name=".MainActivity"
             android:exported="true"
