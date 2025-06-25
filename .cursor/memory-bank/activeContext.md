@@ -1,124 +1,125 @@
 # Active Context
 
-## Authentication Status
-- ✅ Email/Password Authentication: Implemented and tested successfully
-- ✅ Google Sign-In: Implemented and tested successfully
-- ✅ Firebase Integration: Configured and working properly
+## Current Development Phase
+Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented.
 
 ## Recent Changes
-1. Successfully configured Firebase Authentication
-2. Implemented Google Sign-In with proper SHA-1 fingerprint: `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`
-3. Fixed Android build configuration to properly handle native modules
-4. Resolved `google-services.json` persistence issues during builds
+1. Implemented friend management system:
+   - Friend repository with search, requests, and listing
+   - Friend request UI with accept/reject functionality
+   - User search capability
+2. Created snap sharing workflow:
+   - Recipient selection screen
+   - Snap upload with multiple recipients
+   - Snap viewing with auto-destruction
+3. Set up data models:
+   - User model
+   - Snap model
+   - FriendRequest model
+4. Configured Firebase security rules:
+   - User document access control
+   - Snap document permissions
+   - Friendship document rules
+5. Created Firestore indexes:
+   - Composite index for querying snaps by recipients with ordering
+6. Implemented basic AR filter UI:
+   - Added AR dependencies
+   - Created filter selection UI
+   - Added toggle between normal camera and AR mode
+   - Set up simplified AR filter manager
 
-## Current Focus
-- Authentication flow is complete and working
-- Both authentication methods (Email/Password and Google Sign-In) are functioning correctly
-- Native Android configuration is stable and builds successfully
-
-## Active Decisions
-1. Using Firebase for authentication backend
-2. Using `@react-native-google-signin/google-signin` for Google authentication
-3. Using `@react-native-firebase/auth` for Firebase authentication
-4. Maintaining `google-services.json` in version control for easier development
+## Active Focus Areas
+1. Firebase integration completion
+2. UI polish and consistency
+3. Performance optimization
+4. Error handling improvements
+5. User experience enhancements
 
 ## Next Steps
-1. Consider implementing additional authentication methods if needed
-2. Add error handling for edge cases
-3. Implement user profile management
-4. Add logout functionality
-5. Consider implementing password reset functionality
+1. Complete AR filters implementation with real 3D models
+   - Fix compatibility issues with ARCore/Sceneform library
+   - Implement proper face tracking and model placement
+   - Add real 3D models for filters
+2. Set up push notifications for new snaps
+3. Add offline support
+4. Implement video recording capability
+5. Add profile management features
 
-## Current Decisions
-1. Using Firebase JS SDK v9+ for modular imports
-2. Implementing proper error handling for auth
-3. Following Expo's Firebase integration guide
-4. Using Expo Dev Client for native code support
+## Current Challenges
+1. Optimizing camera performance
+2. Managing media storage efficiently
+3. Implementing secure content delivery
+4. Handling offline scenarios
+5. Ensuring proper auto-destruction of content
+6. ARCore/Sceneform library compatibility issues
 
-## Active Decisions
-1. Using Expo managed workflow for faster development
-2. Firebase as the backend platform for scalability
-3. TypeScript for type safety and better development experience
-4. Cloud Functions with TypeScript for backend logic
-5. Firestore for real-time data sync
-6. Cloud Storage for media files
+## Technical Decisions
+1. Using Jetpack Compose for UI
+2. Firebase Auth for authentication
+3. Firestore for user and snap data
+4. Firebase Storage for media files
+5. CameraX for camera implementation
+6. Coil for image loading
+7. ARCore and Sceneform for AR filters (simplified implementation for now)
+8. WorkManager for background tasks (planned)
 
-## Current Tasks
+## Testing Status
+1. Basic unit tests needed for auth flow
+2. UI tests to be set up
+3. Integration tests pending
+4. Camera functionality tests needed
+5. AR functionality tests needed
 
-### Completed
-- [x] Project structure setup
-- [x] Initial dependency installation
-- [x] Basic documentation
-- [x] Firebase project initialization
-- [x] Firebase services setup
+## Documentation Needs
+1. Authentication flow documentation
+2. Firebase setup guide
+3. UI component documentation
+4. Camera implementation guide
+5. AR filter implementation guide
+6. Testing strategy documentation
 
-### In Progress
-- [ ] Firebase SDK integration in React Native app
-- [ ] Environment configuration
-- [ ] Security rules setup
+## Current Branch Structure
+```
+main
+└── feature/friend-management (completed)
+    └── feature/snap-viewing (completed)
+        └── feature/security-rules (completed)
+            └── feature/firestore-indexes (completed)
+                └── feature/ar-filters (in progress)
+```
 
-### Up Next
-1. Firebase SDK Integration
-   - Install Firebase SDKs for React Native
-   - Configure Firebase in the app
-   - Set up environment variables
+## Active Issues
+1. Media compression for efficient storage
+2. Advanced screenshot prevention
+3. Push notification setup
+4. Offline support implementation
+5. Profile management features
+6. AR model loading and face tracking
 
-2. Security Rules Configuration
-   - Firestore security rules
-   - Storage security rules
-   - Authentication rules
+## Recent Pull Requests
+1. Authentication flow implementation (merged)
+2. Camera functionality (merged)
+3. Friend management system (merged)
+4. Snap viewing with auto-destruction (merged)
+5. Firebase security rules (merged)
+6. Firestore indexes for snap queries (merged)
+7. Basic AR filters UI implementation (in progress)
 
-3. App Structure Setup
-   - Navigation configuration
-   - Screen components
-   - Theme and styling
-   - Type definitions
+## Immediate TODOs
+1. Fix ARCore/Sceneform compatibility issues
+2. Complete AR filters implementation with real 3D models
+3. Set up push notifications for new snaps
+4. Add offline queue for snap uploads
+5. Implement video recording capability
+6. Create profile editing screen
 
-## Technical Debt
-- Environment variables setup needed
-- Firebase configuration in app pending
-- Security rules need review and implementation
-- Type definitions for Firebase responses needed
-
-## Known Issues
-- None at this stage
-
-## Immediate Actions
-1. Install Firebase SDKs:
-   ```bash
-   npm install @react-native-firebase/app
-   npm install @react-native-firebase/auth
-   npm install @react-native-firebase/firestore
-   npm install @react-native-firebase/storage
-   npm install @react-native-firebase/functions
-   ```
-2. Set up environment variables
-3. Configure Firebase in the app
-4. Implement security rules
-5. Create basic app structure
-
-## Questions to Resolve
-1. Firebase configuration strategy (environment variables vs config file)
-2. Security rules structure and best practices
-3. Media storage organization
-4. Push notification setup
-5. Development vs Production environments
-
-## Dependencies
-- Firebase SDK integration (PENDING)
-- Environment configuration (PENDING)
-- Navigation structure (PENDING)
-- Authentication flow (PENDING)
-
-## Risk Assessment
-1. Firebase configuration security
-2. Phone authentication setup
-3. Media storage security
-4. Cross-platform compatibility
-
-## Next Milestone
-Firebase Integration & Basic App Structure
-- Target: Complete Firebase SDK integration and basic app structure
-- Status: Firebase services initialized
-- Blockers: Firebase SDK integration pending
-- Dependencies: Firebase configuration, environment setup 
+## Current Dependencies
+See `build.gradle.kts` for full list:
+1. Firebase Auth, Firestore, Storage
+2. Jetpack Compose
+3. Navigation Components
+4. CameraX
+5. Accompanist Permissions
+6. Coil for image loading
+7. ARCore and Sceneform for AR
+8. Kotlin Coroutines 

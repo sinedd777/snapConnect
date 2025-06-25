@@ -1,99 +1,48 @@
-# SnapConnect Project Brief
+# SnapConnect - Self-Destructing Photo/Video Sharing App
 
 ## Project Overview
-SnapConnect is a React Native mobile application built with Expo and Firebase integration. The app aims to provide a modern mobile messaging platform with real-time communication capabilities.
+SnapConnect is an Android application built with Kotlin and Jetpack Compose that enables friends to share ephemeral photo/video "snaps" with AR effects. The platform is backed by Firebase services for authentication, storage, data management, and push notifications.
+
+## Current Status
+Authentication flow with email/password implemented, basic camera functionality working, and initial snap upload capability in place. Navigation structure established with auth, home, and camera screens.
 
 ## Core Requirements
-1. Cross-platform support (iOS and Android)
-2. Firebase Authentication for user management
-3. Real-time messaging capabilities
-4. Modern and responsive UI
-5. Secure data handling
 
-## Project Goals
-1. Create a reliable and performant mobile messaging application
-2. Implement secure user authentication
-3. Provide real-time message synchronization
-4. Ensure smooth cross-platform experience
-5. Follow React Native and Firebase best practices
+### MVP Focus Areas
+1. Rapid photo/video capture ✅ (Photo capture implemented)
+2. Private content delivery 🟡 (In progress)
+3. Automatic content expiration 🟡 (In progress)
+4. Basic friend management ⭕ (Pending)
+5. AR effects integration ⭕ (Pending)
 
-## Technical Stack
-- React Native with Expo
-- Firebase (Authentication, Firestore, Storage)
-- TypeScript for type safety
-- Expo Dev Client for native code integration
+### User Roles
+1. **New User**: Registration and onboarding ✅ (Basic implementation)
+2. **User**: Friend network management ⭕ (Pending)
+3. **Sender**: Content creation and sharing 🟡 (Basic implementation)
+4. **Recipient**: Content viewing ⭕ (Pending)
+5. **Admin**: Content moderation ⭕ (Pending)
 
-## Project Vision
-SnapConnect is a mobile application that enables friends to share ephemeral photo and video content ("snaps") with AR effects and real-time notifications. The app emphasizes privacy, real-time engagement, and seamless user experience.
+### Key Features
+1. Email/password authentication ✅ (Implemented)
+2. Friend management via contacts/search/QR ⭕ (Pending)
+3. Photo/video capture with filters 🟡 (Basic photo capture)
+4. Self-destructing content viewing ⭕ (Pending)
+5. Push notifications ⭕ (Pending)
+6. Admin moderation tools ⭕ (Pending)
 
-## Core Value Proposition
-- Private, ephemeral photo/video sharing between friends
-- Real-time notifications and engagement
-- AR filters and effects for creative expression
-- Automatic content expiry for privacy
-- Simple friend management system
+## Success Criteria
+1. Successful user registration and verification ✅ (Implemented)
+2. Seamless friend connection process ⭕ (Pending)
+3. Fast and reliable snap delivery 🟡 (In progress)
+4. Automatic content expiration ⭕ (Pending)
+5. Effective abuse prevention ⭕ (Pending)
+6. GDPR compliance ⭕ (Pending)
+7. Robust offline support ⭕ (Pending)
 
-## MVP Features
-1. Phone Authentication
-   - SMS verification
-   - Token refresh handling
-   - Username setup
-
-2. Media Handling
-   - Photo/video capture
-   - Client-side compression
-   - Firebase Storage integration
-   - Automatic expiry
-
-3. Friend Management
-   - Add via contacts/search/QR
-   - Real-time friend status
-   - Privacy controls
-
-4. Content Delivery
-   - Real-time snap delivery
-   - Push notifications
-   - View tracking
-   - Screenshot detection
-
-5. Security & Privacy
-   - Firestore security rules
-   - Content moderation
-   - GDPR compliance
-   - Offline support
-
-## Success Metrics
-1. User Engagement
-   - Daily Active Users (DAU)
-   - Snaps sent per user
-   - Friend network growth
-
-2. Technical Performance
-   - Upload success rate
-   - Notification delivery rate
-   - App crash rate
-   - Load times
-
-3. Security & Privacy
-   - Successful content expiry rate
-   - Security rule effectiveness
-   - Moderation response time
-
-## Project Timeline
-Phase 1: MVP Development
-- Auth & User Management
-- Basic Camera & Upload
-- Friend System
-- Real-time Delivery
-
-Phase 2: Enhancement
-- AR Effects
-- Advanced Privacy
-- Performance Optimization
-- Analytics Implementation
-
-Phase 3: Scale & Polish
-- Admin Tools
-- Content Moderation
-- Security Hardening
-- GDPR Compliance 
+## Non-Functional Requirements
+1. Performance optimization 🟡 (In progress)
+2. Security measures 🟡 (Basic implementation)
+3. Privacy protection ⭕ (Pending)
+4. Scalability considerations ⭕ (Pending)
+5. Monitoring and analytics ⭕ (Pending)
+6. Crash reporting ⭕ (Pending) 

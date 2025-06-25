@@ -1,118 +1,88 @@
 # Product Context
 
-## Purpose
-SnapConnect is a modern mobile messaging application designed to provide users with a seamless and secure communication platform. The app focuses on real-time messaging with a strong emphasis on user experience and security.
-
 ## Problem Statement
-In the current messaging app landscape, users need:
-1. A reliable and fast messaging platform
-2. Secure and private communications
-3. Cross-platform compatibility
-4. Real-time message delivery
-5. Simple and intuitive user interface
+Users want to share authentic, spontaneous moments with close friends without worrying about permanent digital footprints or content being accessible to unintended audiences.
 
 ## Solution
-SnapConnect addresses these needs by:
-1. Using Firebase for real-time data synchronization
-2. Implementing secure authentication and data storage
-3. Building with React Native for cross-platform support
-4. Creating a modern and intuitive UI
-5. Following mobile platform best practices
+SnapConnect provides a secure, ephemeral photo/video sharing platform that:
+- Enables quick capture and sharing of moments
+- Ensures content auto-deletion after viewing
+- Maintains privacy through friend-only sharing
+- Detects and prevents unauthorized content saving
+- Offers engaging AR filters and effects
+
+## Current Implementation Focus
+- Authentication via email/password
+- Basic camera functionality for photo capture
+- Initial snap storage and metadata
+- Simple navigation between auth, home, and camera screens
 
 ## User Experience Goals
-1. Fast and Responsive
-   - Quick message delivery
-   - Smooth animations
-   - Efficient data loading
 
-2. Simple and Intuitive
-   - Clean user interface
-   - Clear navigation
-   - Familiar messaging patterns
+### New User Experience
+1. Simple email/password registration
+2. Quick profile setup
+3. Intuitive friend discovery (planned)
+4. Clear privacy controls (planned)
 
-3. Reliable and Secure
-   - Stable connection handling
-   - Secure data transmission
-   - Private user data
+### Content Creation
+1. Instant camera access
+2. Real-time AR filters (planned)
+3. Simple recipient selection (planned)
+4. Quick send process
 
-## Target Users
-1. Primary Users
-   - Mobile-first users
-   - Privacy-conscious individuals
-   - Users seeking reliable messaging
-
-2. Use Cases
-   - Personal messaging
-   - Group conversations
-   - Media sharing
-   - Profile management
-
-## Success Metrics
-1. Technical
-   - App performance metrics
-   - Error rates
-   - Message delivery speed
-
-2. User Experience
-   - User engagement
-   - Session duration
-   - Feature adoption rate
-
-3. Business
-   - User growth
-   - User retention
-   - Platform stability
-
-## User Roles & Permissions
-
-### New User
-- Can sign up with phone number
-- Must verify via SMS
-- Sets username
-- Can search for friends
-
-### Active User
-- Can manage friend list
-- Can send/receive snaps
-- Can modify privacy settings
-- Can report inappropriate content
-
-### Admin
-- Can review flagged content
-- Can remove violating content
-- Can ban users
-- Can view abuse metrics
-
-## Key Interactions
-
-### Snap Creation
-1. Open camera
-2. Capture content
-3. Apply optional effects
-4. Select recipients
-5. Send instantly
-
-### Snap Viewing
-1. Receive push notification
-2. Open app to inbox
-3. Press to view content
-4. Content auto-expires after viewing
-5. Optional quick reply
+### Content Consumption
+1. Push notification alerts (planned)
+2. One-time viewing (planned)
+3. Countdown timer display (planned)
+4. Reply functionality (planned)
 
 ### Friend Management
-1. Find friends via:
-   - Phone contacts
-   - Username search
-   - QR code scan
-2. Send friend request
-3. Accept/decline requests
-4. Manage privacy settings
+1. Contact sync option (planned)
+2. QR code scanning (planned)
+3. Username search (planned)
+4. Friend request flow (planned)
 
-## Success Indicators
-- High DAU/MAU ratio
-- Growing friend networks
-- Frequent snap exchanges
-- Low report/abuse rates
-- Positive user feedback
-- Quick content delivery times
-- Reliable notification delivery 
+### Privacy & Security
+1. Screenshot detection (planned)
+2. View tracking (planned)
+3. Friend-only sharing (planned)
+4. Content moderation (planned)
+
+## User Workflows
+
+### Registration Flow (Implemented)
+1. Enter email
+2. Create password
+3. Sign up
+4. Basic profile creation
+
+### Snap Creation Flow (Partially Implemented)
+1. Open camera ✅
+2. Capture content ✅
+3. Apply filters (planned)
+4. Select recipients (planned)
+5. Send snap (basic implementation)
+
+### Snap Viewing Flow (Planned)
+1. Receive notification
+2. Open snap
+3. View with countdown
+4. Optional reply
+5. Auto-destruction
+
+### Friend Addition Flow (Planned)
+1. Choose add method
+2. Find friend
+3. Send request
+4. Accept/reject
+5. Start sharing
+
+## Success Metrics (To Be Implemented)
+1. Daily Active Users (DAU)
+2. Snaps sent per user
+3. Friend network growth
+4. Feature engagement
+5. Retention rates
+6. App stability
+7. Response times 
