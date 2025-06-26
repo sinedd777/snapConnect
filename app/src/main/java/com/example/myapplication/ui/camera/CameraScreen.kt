@@ -27,6 +27,7 @@ import com.example.myapplication.data.repositories.SnapRepository
 import com.example.myapplication.ui.camera.filters.ARFilter
 import com.example.myapplication.ui.camera.filters.ARFilterManager
 import com.example.myapplication.ui.camera.filters.FilterSelector
+import com.example.myapplication.ui.theme.ScreenshotProtection
 import com.google.accompanist.permissions.*
 import io.github.sceneview.ar.ArSceneView
 import java.io.File
@@ -41,6 +42,9 @@ fun CameraScreen(
     onSnapCaptured: (Uri?) -> Unit,
     onBack: () -> Unit = {}
 ) {
+    // Apply screenshot protection
+    ScreenshotProtection()
+    
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()

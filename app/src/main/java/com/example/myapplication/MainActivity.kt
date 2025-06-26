@@ -13,14 +13,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.myapplication.navigation.AppNavGraph
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.example.myapplication.ui.theme.SnapConnectTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
+            SnapConnectTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
                         AppNavGraph()
@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    MyApplicationTheme {
+    SnapConnectTheme {
         AppNavGraph()
     }
 }

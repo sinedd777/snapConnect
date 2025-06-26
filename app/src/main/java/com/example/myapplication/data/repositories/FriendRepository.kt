@@ -185,20 +185,50 @@ class FriendRepository {
     suspend fun searchUsers(query: String): Result<List<User>> = try {
         val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("No user"))
         
-        // Search for users by email or username
-        val results = firestore.collection("users")
-            .whereGreaterThanOrEqualTo("email", query)
-            .whereLessThanOrEqualTo("email", query + "\uf8ff")
-            .limit(10)
+        val normalizedQuery = query.trim().lowercase()
+        
+        // Get all existing friendships to filter out users who are already friends or have pending requests
+        val existingFriendshipsAsUserA = firestore.collection("friendships")
+            .whereEqualTo("userA", currentUserId)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.getString("userB") }
+            
+        val existingFriendshipsAsUserB = firestore.collection("friendships")
+            .whereEqualTo("userB", currentUserId)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.getString("userA") }
+            
+        val existingConnections = existingFriendshipsAsUserA + existingFriendshipsAsUserB
+        
+        // Search for users by email (prefix match)
+        val emailResults = firestore.collection("users")
+            .whereGreaterThanOrEqualTo("email", normalizedQuery)
+            .whereLessThanOrEqualTo("email", normalizedQuery + "\uf8ff")
+            .limit(20)
             .get()
             .await()
             
-        val users = results.documents
+        // Search for users by username (prefix match)
+        val usernameResults = firestore.collection("users")
+            .whereGreaterThanOrEqualTo("username", normalizedQuery)
+            .whereLessThanOrEqualTo("username", normalizedQuery + "\uf8ff")
+            .limit(20)
+            .get()
+            .await()
+            
+        // Combine results and remove duplicates
+        val combinedResults = (emailResults.documents + usernameResults.documents)
             .mapNotNull { it.data }
+            .distinctBy { it["uid"] }
             .filter { it["uid"] != currentUserId } // Exclude current user
+            .filter { it["uid"] !in existingConnections } // Exclude existing friends and pending requests
             .map { User.fromMap(it) }
             
-        Result.success(users)
+        Result.success(combinedResults)
     } catch (e: Exception) {
         Result.failure(e)
     }

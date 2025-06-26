@@ -24,6 +24,7 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.myapplication.data.models.Snap
 import com.example.myapplication.data.repositories.SnapRepository
+import com.example.myapplication.ui.theme.ScreenshotProtection
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -33,6 +34,9 @@ fun SnapViewerScreen(
     snapId: String,
     onClose: () -> Unit
 ) {
+    // Apply screenshot protection
+    ScreenshotProtection()
+    
     val context = LocalContext.current
     val snapRepository = remember { SnapRepository() }
     val coroutineScope = rememberCoroutineScope()

@@ -15,6 +15,7 @@ import com.example.myapplication.ui.circles.CirclesScreen
 import com.example.myapplication.ui.circles.CreateCircleScreen
 import com.example.myapplication.ui.friends.FriendsScreen
 import com.example.myapplication.ui.home.HomeScreen
+import com.example.myapplication.ui.profile.ProfileScreen
 import com.example.myapplication.ui.snap.SnapViewerScreen
 import com.google.firebase.auth.FirebaseAuth
 
@@ -28,6 +29,7 @@ object Destinations {
     const val CREATE_CIRCLE = "create_circle"
     const val CIRCLE_DETAIL = "circle_detail/{circleId}"
     const val CAMERA_FOR_CIRCLE = "camera_for_circle/{circleId}"
+    const val PROFILE = "profile"
     
     fun snapViewer(snapId: String) = "snap_viewer/$snapId"
     fun circleDetail(circleId: String) = "circle_detail/$circleId"
@@ -64,6 +66,9 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 },
                 onOpenCircles = {
                     navController.navigate(Destinations.CIRCLES)
+                },
+                onOpenProfile = {
+                    navController.navigate(Destinations.PROFILE)
                 }
             )
         }
@@ -116,6 +121,21 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 snapId = snapId,
                 onClose = {
                     navController.popBackStack()
+                }
+            )
+        }
+        
+        // Profile screen
+        composable(Destinations.PROFILE) {
+            ProfileScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onLogout = {
+                    // Navigate to auth screen and clear back stack
+                    navController.navigate(Destinations.AUTH) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
                 }
             )
         }

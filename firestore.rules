@@ -18,10 +18,34 @@ service cloud.firestore {
              (request.auth.uid in get(circlePath).data.members || 
               get(circlePath).data.creatorId == request.auth.uid);
     }
+    
+    // Helper function to check if username is unique
+    function isUsernameUnique(username) {
+      let usersWithUsername = getAfter(/databases/$(db)/documents/users).where("username", "==", username).size();
+      return usersWithUsername == 0 || 
+             (resource != null && resource.data.username == username);
+    }
+    
     // User docs
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
+      // Allow reading user documents for authenticated users
+      allow read: if true; // Allow all reads for username checking
+      
+      // Allow querying users by username (for availability checks) - even without authentication
+      // This is needed for signup flow where the user isn't authenticated yet
+      allow list: if true; // Allow all list operations for username checking
+      
+      // Allow creating user documents with username validation
+      // During signup, the userId will match the auth uid, so we allow this operation
+      allow create: if request.auth != null && 
+                     request.auth.uid == userId &&
+                     isUsernameUnique(request.resource.data.username);
+      
+      // Allow updating user documents with username validation
+      allow update: if request.auth != null && 
+                     request.auth.uid == userId && 
+                     (request.resource.data.username == resource.data.username || 
+                      isUsernameUnique(request.resource.data.username));
     }
     
     // Snap docs

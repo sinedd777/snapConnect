@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.friends
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.models.FriendRequest
 import com.example.myapplication.data.models.User
 import com.example.myapplication.data.repositories.FriendRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +46,9 @@ fun FriendsScreen(
     var isSearching by remember { mutableStateOf(false) }
     var activeTab by remember { mutableStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var showSearchResults by remember { mutableStateOf(false) }
+    var friendRequestSuccess by remember { mutableStateOf<String?>(null) }
     
     // Load friends and requests on first composition
     LaunchedEffect(Unit) {
@@ -55,6 +61,44 @@ fun FriendsScreen(
             requestsResult.fold(
                 onSuccess = { requestsList -> pendingRequests = requestsList },
                 onFailure = { e -> error = e.message }
+            )
+        }
+    }
+    
+    // Auto-hide success message after 3 seconds
+    LaunchedEffect(friendRequestSuccess) {
+        if (friendRequestSuccess != null) {
+            delay(3000)
+            friendRequestSuccess = null
+        }
+    }
+    
+    // Function to perform search
+    fun performSearch() {
+        if (searchQuery.length < 2) {
+            searchError = "Please enter at least 2 characters"
+            return
+        }
+        
+        focusManager.clearFocus()
+        isSearching = true
+        searchError = null
+        showSearchResults = true
+        
+        coroutineScope.launch {
+            val result = friendRepository.searchUsers(searchQuery)
+            isSearching = false
+            result.fold(
+                onSuccess = { users -> 
+                    searchResults = users
+                    if (users.isEmpty()) {
+                        searchError = "No users found matching '$searchQuery'"
+                    }
+                },
+                onFailure = { e -> 
+                    searchError = "Search failed: ${e.message}"
+                    searchResults = emptyList()
+                }
             )
         }
     }
@@ -81,68 +125,85 @@ fun FriendsScreen(
                 value = searchQuery,
                 onValueChange = { 
                     searchQuery = it
-                    if (it.length >= 3) {
-                        isSearching = true
-                        coroutineScope.launch {
-                            val result = friendRepository.searchUsers(it)
-                            result.fold(
-                                onSuccess = { users -> searchResults = users },
-                                onFailure = { e -> error = e.message }
-                            )
-                            isSearching = false
-                        }
-                    } else {
-                        searchResults = emptyList()
-                    }
+                    searchError = null
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                placeholder = { Text("Search by email") },
+                placeholder = { Text("Search by username or email") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        Row {
+                            IconButton(onClick = { 
+                                searchQuery = ""
+                                searchError = null
+                                showSearchResults = false
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                            IconButton(onClick = { performSearch() }) {
+                                Icon(Icons.Default.Send, contentDescription = "Search")
+                            }
                         }
                     }
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        if (searchQuery.length >= 3) {
-                            focusManager.clearFocus()
-                            isSearching = true
-                            coroutineScope.launch {
-                                val result = friendRepository.searchUsers(searchQuery)
-                                result.fold(
-                                    onSuccess = { users -> searchResults = users },
-                                    onFailure = { e -> error = e.message }
-                                )
-                                isSearching = false
-                            }
-                        }
-                    }
-                )
+                keyboardActions = KeyboardActions(onSearch = { performSearch() }),
+                isError = searchError != null,
+                supportingText = searchError?.let { { Text(it) } }
             )
             
+            // Friend request success message
+            AnimatedVisibility(visible = friendRequestSuccess != null) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Success",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = friendRequestSuccess ?: "",
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+            
             // Show search results if any
-            if (searchQuery.isNotEmpty()) {
+            if (showSearchResults) {
                 SearchResultsSection(
                     searchResults = searchResults,
                     isSearching = isSearching,
-                    onSendRequest = { userId ->
+                    onSendRequest = { userId, username ->
                         coroutineScope.launch {
                             val result = friendRepository.sendFriendRequest(userId)
                             result.fold(
                                 onSuccess = { 
                                     // Remove from search results
                                     searchResults = searchResults.filter { it.id != userId }
+                                    friendRequestSuccess = "Friend request sent to $username"
                                 },
-                                onFailure = { e -> error = e.message }
+                                onFailure = { e -> searchError = "Failed to send request: ${e.message}" }
                             )
                         }
+                    },
+                    onBack = {
+                        showSearchResults = false
+                        searchQuery = ""
+                        searchError = null
                     }
                 )
             } else {
@@ -203,6 +264,7 @@ fun FriendsScreen(
                                                 onFailure = { e -> error = e.message }
                                             )
                                         }
+                                        friendRequestSuccess = "Friend request accepted"
                                     },
                                     onFailure = { e -> error = e.message }
                                 )
@@ -215,6 +277,7 @@ fun FriendsScreen(
                                     onSuccess = {
                                         // Remove from list
                                         pendingRequests = pendingRequests.filter { it.id != requestId }
+                                        friendRequestSuccess = "Friend request rejected"
                                     },
                                     onFailure = { e -> error = e.message }
                                 )
@@ -231,29 +294,63 @@ fun FriendsScreen(
 fun SearchResultsSection(
     searchResults: List<User>,
     isSearching: Boolean,
-    onSendRequest: (String) -> Unit
+    onSendRequest: (String, String?) -> Unit,
+    onBack: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (isSearching) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        } else if (searchResults.isEmpty()) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back to friends")
+            }
             Text(
-                text = "No users found",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(16.dp)
+                text = "Search Results",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
             )
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(searchResults) { user ->
-                    UserSearchItem(
-                        user = user,
-                        onSendRequest = { onSendRequest(user.id) }
+        }
+        
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isSearching) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (searchResults.isEmpty()) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.PersonSearch,
+                        contentDescription = "No results",
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
+                    Text(
+                        text = "No users found",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Try a different search term",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(searchResults) { user ->
+                        UserSearchItem(
+                            user = user,
+                            onSendRequest = { onSendRequest(user.id, user.username) }
+                        )
+                    }
                 }
             }
         }
@@ -284,7 +381,9 @@ fun UserSearchItem(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = user.email?.firstOrNull()?.toString() ?: "?",
+                    text = user.username?.firstOrNull()?.toString() 
+                        ?: user.email?.firstOrNull()?.toString() 
+                        ?: "?",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )

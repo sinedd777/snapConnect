@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Overall Status
-Project is in active development with authentication, camera functionality, friend management, snap sharing, and basic AR filter UI implemented. Firebase security rules and indexes have been configured. Transitioning from SnapConnect to SnapCircle with a focus on group-based sharing and RAG integration.
+Project is in active development with authentication, camera functionality, friend management, snap sharing, and basic AR filter UI implemented. Firebase security rules and indexes have been configured. Material 3 design system has been implemented with enhanced UI components and a new profile screen. Transitioning from SnapConnect to SnapCircle with a focus on group-based sharing and RAG integration.
 
 ## Completed Features
 1. Project initialization
@@ -32,6 +32,7 @@ Project is in active development with authentication, camera functionality, frie
 5. User Management
    - ✅ Basic profile creation
    - ✅ Data models
+   - ✅ Basic profile display
    - 🟡 Profile editing
    - 🟡 Avatar upload
 
@@ -59,6 +60,18 @@ Project is in active development with authentication, camera functionality, frie
    - ✅ Auto-destruction
    - 🟡 Basic screenshot detection
    - 🟡 Advanced screenshot prevention
+
+9. UI/UX Enhancements
+   - ✅ Material 3 theme implementation
+   - ✅ Custom color schemes for light/dark modes
+   - ✅ Custom shape definitions
+   - ✅ Enhanced visual hierarchy
+   - ✅ Improved component styling
+   - ✅ Profile screen implementation
+   - ✅ Bottom navigation bar
+   - 🟡 Applying Material 3 to all screens
+   - 🟡 Animation and transitions
+   - 🟡 Accessibility improvements
 
 ## In-Progress Features
 1. Circle Implementation
@@ -113,6 +126,9 @@ Project is in active development with authentication, camera functionality, frie
 1. Authentication Flow
    - Need to add password reset functionality
    - Need to implement email verification
+   - ✅ Fixed username availability checking during signup
+   - ✅ Fixed Firestore security rules to allow unauthenticated username checks
+   - ✅ Simplified security rules for user document reads
 
 2. Camera Implementation
    - Permission handling needs improvement
@@ -126,6 +142,7 @@ Project is in active development with authentication, camera functionality, frie
    - Home screen needs enhancement for Circle-based UI
    - Navigation transitions need polish
    - Loading states need implementation
+   - Material 3 needs to be applied to all screens consistently
 
 4. Firestore Security
    - ✅ Fixed permission issues with Circle-based snap queries by:
@@ -160,6 +177,7 @@ Initial camera performance:
    - ⭕ API documentation
    - ⭕ Circle functionality documentation
    - ⭕ RAG integration documentation
+   - ⭕ Material 3 theme customization
 
 2. Technical Docs
    - 🟡 Architecture overview
@@ -167,6 +185,7 @@ Initial camera performance:
    - ⭕ API endpoints
    - ⭕ Circle data model
    - ⭕ RAG implementation
+   - ⭕ Material 3 implementation guide
 
 3. User Guides
    - ⭕ User manual
@@ -181,15 +200,17 @@ Initial camera performance:
 - CI/CD pipeline not yet set up
 
 ## Next Milestones
-1. Design and implement Circle data model
-2. Update existing UI for Circle-based interaction
-3. Fix ARCore/Sceneform compatibility issues
-4. Complete AR filter implementation with real 3D models
-5. Design and begin RAG integration
-6. Implement collaborative story features
-7. Add location-based functionality
-8. Set up push notifications for Circle activity
-9. Implement Memory Vault for content saving
+1. Apply Material 3 design to all remaining screens
+2. Add profile editing functionality
+3. Design and implement Circle data model
+4. Update existing UI for Circle-based interaction
+5. Fix ARCore/Sceneform compatibility issues
+6. Complete AR filter implementation with real 3D models
+7. Design and begin RAG integration
+8. Implement collaborative story features
+9. Add location-based functionality
+10. Set up push notifications for Circle activity
+11. Implement Memory Vault for content saving
 
 Legend:
 - ✅ Complete

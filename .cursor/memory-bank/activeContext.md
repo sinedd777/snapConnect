@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Development Phase
-Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning from individual snap sharing to Circle-based group sharing with RAG integration.
+Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning from individual snap sharing to Circle-based group sharing with RAG integration. UI enhanced with Material 3 design system.
 
 ## Recent Changes
 1. Implemented friend management system:
@@ -23,6 +23,8 @@ Core functionality implemented with authentication, camera, friend management, a
    - Friendship document rules
    - Circle document permissions
    - Fixed permission issues with Circle-based snap queries
+   - Updated rules to allow unauthenticated username availability checks
+   - Simplified user document read rules to enable username checking
 5. Created Firestore indexes:
    - Composite index for querying snaps by recipients with ordering
    - Composite index for querying snaps by circleId with ordering
@@ -31,6 +33,24 @@ Core functionality implemented with authentication, camera, friend management, a
    - Created filter selection UI
    - Added toggle between normal camera and AR mode
    - Set up simplified AR filter manager
+7. Enhanced UI with Material 3:
+   - Implemented proper Material 3 theming
+   - Added custom color schemes for light/dark modes
+   - Created custom shapes for consistent UI elements
+   - Enhanced component styling with Material 3 guidelines
+   - Improved visual hierarchy and spacing
+8. Added profile screen:
+   - User details display
+   - Account information section
+   - Settings section
+   - Logout functionality
+   - Material 3 styling
+9. Fixed username availability check in authentication flow:
+   - Moved checkUsernameAvailability function outside of composable scope
+   - Fixed scope issues with Firebase references
+   - Ensured proper username validation during signup
+   - Updated Firestore security rules to allow unauthenticated username checks
+   - Simplified security rules for user document reads
 
 ## Product Transition
 1. Rebranding from SnapConnect to SnapCircle
@@ -75,6 +95,16 @@ Core functionality implemented with authentication, camera, friend management, a
 6. Add offline support
 7. Implement video recording capability
 8. Add location-based Circle functionality
+9. Enhance profile screen:
+   - Add profile editing functionality
+   - Implement avatar upload
+   - Add user statistics
+   - Create theme preferences
+10. Apply Material 3 design to remaining screens:
+    - Authentication screens
+    - Camera screens
+    - Circle screens
+    - Friend management screens
 
 ## Current Challenges
 1. Optimizing camera performance
@@ -99,6 +129,8 @@ Core functionality implemented with authentication, camera, friend management, a
 8. WorkManager for background tasks (planned)
 9. RAG API integration (evaluating options)
 10. Location services for geofencing (planned)
+11. Material 3 for consistent design system
+12. Dynamic color support for Android 12+ devices
 
 ## Testing Status
 1. Basic unit tests needed for auth flow
@@ -118,6 +150,7 @@ Core functionality implemented with authentication, camera, friend management, a
 6. Circle data model documentation
 7. RAG integration documentation
 8. Testing strategy documentation
+9. Material 3 theme customization guide
 
 ## Current Branch Structure
 ```
@@ -129,6 +162,8 @@ main
                 └── feature/ar-filters (in progress)
                     └── feature/circle-model (planned)
                         └── feature/rag-integration (planned)
+                            └── feature/material3-enhancements (completed)
+                                └── feature/profile-screen (completed)
 ```
 
 ## Active Issues
@@ -150,6 +185,8 @@ main
 5. Firebase security rules (merged)
 6. Firestore indexes for snap queries (merged)
 7. Basic AR filters UI implementation (in progress)
+8. Material 3 enhancements (merged)
+9. Profile screen implementation (merged)
 
 ## Immediate TODOs
 1. Design Circle data model
@@ -161,7 +198,8 @@ main
 7. Set up push notifications for Circle activity
 8. Add offline queue for content uploads
 9. Implement video recording capability
-10. Create profile editing screen
+10. Enhance authentication screens with Material 3
+11. Add profile editing functionality
 
 ## Current Dependencies
 See `build.gradle.kts` for full list:

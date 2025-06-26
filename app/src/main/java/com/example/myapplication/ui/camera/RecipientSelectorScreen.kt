@@ -17,11 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.models.User
 import com.example.myapplication.data.repositories.FriendRepository
+import com.example.myapplication.ui.theme.ScreenshotProtection
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +32,10 @@ fun RecipientSelectorScreen(
     onBack: () -> Unit,
     onSendToRecipients: (List<String>) -> Unit
 ) {
+    // Apply screenshot protection
+    ScreenshotProtection()
+    
+    val context = LocalContext.current
     val friendRepository = remember { FriendRepository() }
     val coroutineScope = rememberCoroutineScope()
     
