@@ -7,12 +7,15 @@ data class Snap(
     val sender: String,
     val senderName: String? = null,
     val recipients: List<String>,
+    val circleId: String? = null,
     val mediaUrl: String,
     val mediaType: String,
     val createdAt: Timestamp,
     val expiresAt: Timestamp? = null,
     val viewedBy: List<String> = emptyList(),
-    val screenshotBy: List<String> = emptyList()
+    val screenshotBy: List<String> = emptyList(),
+    val caption: String? = null,
+    val isCircleContent: Boolean = false
 ) {
     val isViewed: Boolean
         get() = viewedBy.isNotEmpty()
@@ -49,12 +52,15 @@ data class Snap(
                 sender = sender,
                 senderName = map["senderName"] as? String,
                 recipients = recipientsList,
+                circleId = map["circleId"] as? String,
                 mediaUrl = mediaUrl,
                 mediaType = mediaType,
                 createdAt = createdAt,
                 expiresAt = map["expiresAt"] as? Timestamp,
                 viewedBy = (map["viewedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                screenshotBy = (map["screenshotBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                screenshotBy = (map["screenshotBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                caption = map["caption"] as? String,
+                isCircleContent = (map["isCircleContent"] as? Boolean) ?: false
             )
         }
     }

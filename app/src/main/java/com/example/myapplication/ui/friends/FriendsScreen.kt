@@ -138,7 +138,7 @@ fun FriendsScreen(
                             result.fold(
                                 onSuccess = { 
                                     // Remove from search results
-                                    searchResults = searchResults.filter { it.uid != userId }
+                                    searchResults = searchResults.filter { it.id != userId }
                                 },
                                 onFailure = { e -> error = e.message }
                             )
@@ -252,7 +252,7 @@ fun SearchResultsSection(
                 items(searchResults) { user ->
                     UserSearchItem(
                         user = user,
-                        onSendRequest = { onSendRequest(user.uid) }
+                        onSendRequest = { onSendRequest(user.id) }
                     )
                 }
             }
@@ -284,7 +284,7 @@ fun UserSearchItem(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = user.email.firstOrNull()?.toString() ?: "?",
+                    text = user.email?.firstOrNull()?.toString() ?: "?",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
@@ -301,7 +301,7 @@ fun UserSearchItem(
                 )
                 
                 Text(
-                    text = user.email,
+                    text = user.email ?: "No email",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -381,7 +381,7 @@ fun FriendItem(friend: User) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = friend.email.firstOrNull()?.toString() ?: "?",
+                    text = friend.email?.firstOrNull()?.toString() ?: "?",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
@@ -398,7 +398,7 @@ fun FriendItem(friend: User) {
                 )
                 
                 Text(
-                    text = friend.email,
+                    text = friend.email ?: "No email",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -8,6 +8,7 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraScreen(
+    circleId: String? = null,
     onSnapCaptured: (Uri?) -> Unit,
     onBack: () -> Unit = {}
 ) {
@@ -56,6 +58,8 @@ fun CameraScreen(
     var isArMode by remember { mutableStateOf(false) }
     var showFilterSelector by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<ARFilter?>(null) }
+    var captionText by remember { mutableStateOf("") }
+    var showCaptionDialog by remember { mutableStateOf(false) }
     
     // AR state
     val arSceneView = remember { ArSceneView(context) }
@@ -87,7 +91,57 @@ fun CameraScreen(
         return
     }
 
-    if (showRecipientSelector && capturedImageUri != null) {
+    // If we're in Circle mode and have captured an image, show caption dialog
+    if (circleId != null && capturedImageUri != null && showCaptionDialog) {
+        AlertDialog(
+            onDismissRequest = { showCaptionDialog = false },
+            title = { Text("Add a caption") },
+            text = {
+                OutlinedTextField(
+                    value = captionText,
+                    onValueChange = { captionText = it },
+                    label = { Text("Caption (optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCaptionDialog = false
+                        isUploading = true
+                        scope.launch {
+                            val result = snapRepo.uploadSnapToCircle(
+                                capturedImageUri!!,
+                                circleId,
+                                if (captionText.isBlank()) null else captionText
+                            )
+                            isUploading = false
+                            result.fold(
+                                onSuccess = { 
+                                    Toast.makeText(context, "Snap shared to Circle!", Toast.LENGTH_SHORT).show()
+                                    onSnapCaptured(capturedImageUri)
+                                },
+                                onFailure = { e ->
+                                    Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
+                    }
+                ) {
+                    Text("Share")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCaptionDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showRecipientSelector && capturedImageUri != null && circleId == null) {
         RecipientSelectorScreen(
             onBack = { showRecipientSelector = false },
             onSendToRecipients = { recipients ->
@@ -170,6 +224,20 @@ fun CameraScreen(
                 Icon(Icons.Default.Close, contentDescription = "Close")
             }
             
+            // Circle mode indicator if applicable
+            if (circleId != null) {
+                FloatingActionButton(
+                    onClick = { /* No action needed */ },
+                    modifier = Modifier.size(48.dp),
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                ) {
+                    Icon(
+                        Icons.Default.Groups,
+                        contentDescription = "Circle Mode"
+                    )
+                }
+            }
+            
             // Toggle AR mode button
             FloatingActionButton(
                 onClick = { isArMode = !isArMode },
@@ -211,7 +279,12 @@ fun CameraScreen(
                         if (uri != null) {
                             Toast.makeText(context, "AR photo captured", Toast.LENGTH_SHORT).show()
                             capturedImageUri = uri
-                            showRecipientSelector = true
+                            
+                            if (circleId != null) {
+                                showCaptionDialog = true
+                            } else {
+                                showRecipientSelector = true
+                            }
                         } else {
                             Toast.makeText(context, "AR capture failed", Toast.LENGTH_SHORT).show()
                         }
@@ -240,7 +313,12 @@ fun CameraScreen(
                                 val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
                                 Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
                                 capturedImageUri = savedUri
-                                showRecipientSelector = true
+                                
+                                if (circleId != null) {
+                                    showCaptionDialog = true
+                                } else {
+                                    showRecipientSelector = true
+                                }
                             }
                         }
                     )
@@ -248,16 +326,22 @@ fun CameraScreen(
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
-                .size(64.dp)
+                .padding(bottom = 32.dp),
+            containerColor = MaterialTheme.colorScheme.primary
         ) {
-            Icon(Icons.Default.Camera, contentDescription = "Capture", modifier = Modifier.size(32.dp))
+            Icon(
+                Icons.Default.Camera,
+                contentDescription = "Take Photo",
+                modifier = Modifier.size(32.dp)
+            )
         }
-        
-        // Filter selector at the bottom
+
+        // Filter selector
         AnimatedVisibility(
-            visible = showFilterSelector && isArMode,
-            modifier = Modifier.align(Alignment.BottomCenter),
+            visible = showFilterSelector,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 100.dp),
             enter = slideInVertically { it },
             exit = slideOutVertically { it }
         ) {
@@ -267,12 +351,26 @@ fun CameraScreen(
                 onFilterSelected = { filter ->
                     selectedFilter = filter
                     arFilterManager.applyFilter(filter)
+                    showFilterSelector = false
                 },
                 onClearFilter = {
                     selectedFilter = null
-                    arFilterManager.removeCurrentFilter()
+                    arFilterManager.clearFilter()
+                    showFilterSelector = false
                 }
             )
+        }
+
+        // Loading indicator
+        if (isUploading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
         }
     }
 } 

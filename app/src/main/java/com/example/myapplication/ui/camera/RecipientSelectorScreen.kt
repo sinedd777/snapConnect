@@ -141,12 +141,12 @@ fun RecipientSelectorScreen(
                         items(friends) { friend ->
                             FriendSelectionItem(
                                 friend = friend,
-                                isSelected = selectedFriends.contains(friend.uid),
+                                isSelected = selectedFriends.contains(friend.id),
                                 onToggleSelection = {
-                                    selectedFriends = if (selectedFriends.contains(friend.uid)) {
-                                        selectedFriends - friend.uid
+                                    selectedFriends = if (selectedFriends.contains(friend.id)) {
+                                        selectedFriends - friend.id
                                     } else {
-                                        selectedFriends + friend.uid
+                                        selectedFriends + friend.id
                                     }
                                 }
                             )
@@ -192,7 +192,7 @@ fun FriendSelectionItem(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = friend.email.firstOrNull()?.toString() ?: "?",
+                    text = friend.email?.firstOrNull()?.toString() ?: "?",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
@@ -209,7 +209,7 @@ fun FriendSelectionItem(
                 )
                 
                 Text(
-                    text = friend.email,
+                    text = friend.email ?: "No email",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

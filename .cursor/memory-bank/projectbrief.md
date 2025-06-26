@@ -1,43 +1,55 @@
-# SnapConnect - Self-Destructing Photo/Video Sharing App
+# SnapCircle - Ephemeral Group Sharing Platform
 
 ## Project Overview
-SnapConnect is an Android application built with Kotlin and Jetpack Compose that enables friends to share ephemeral photo/video "snaps" with AR effects. The platform is backed by Firebase services for authentication, storage, data management, and push notifications.
+SnapCircle (formerly SnapConnect) is an Android application built with Kotlin and Jetpack Compose that enables users to create invite-only group spaces ("Circles") for sharing ephemeral photos, videos, and live moments. The platform is backed by Firebase services for authentication, storage, data management, and push notifications, with new Retrieval-Augmented Generation (RAG) features for enhanced personalization.
 
 ## Current Status
-Authentication flow with email/password implemented, basic camera functionality working, and initial snap upload capability in place. Navigation structure established with auth, home, and camera screens.
+Authentication flow with email/password implemented, basic camera functionality working, and initial snap upload capability in place. Navigation structure established with auth, home, and camera screens. Friend management system, snap sharing workflow, and basic AR filter UI implemented.
 
 ## Core Requirements
 
 ### MVP Focus Areas
-1. Rapid photo/video capture ✅ (Photo capture implemented)
-2. Private content delivery 🟡 (In progress)
-3. Automatic content expiration 🟡 (In progress)
-4. Basic friend management ⭕ (Pending)
-5. AR effects integration ⭕ (Pending)
+1. Ephemeral Circles creation and management ⭕ (Pending)
+2. Rapid photo/video capture ✅ (Photo capture implemented)
+3. Private content delivery 🟡 (In progress)
+4. Automatic content expiration 🟡 (In progress)
+5. Collaborative Stories ⭕ (Pending)
+6. Live Reactions ⭕ (Pending)
+7. Location-Based Circles ⭕ (Pending)
+8. AR filters integration 🟡 (Basic UI implemented)
+9. RAG-Enhanced features ⭕ (Pending)
 
 ### User Roles
 1. **New User**: Registration and onboarding ✅ (Basic implementation)
-2. **User**: Friend network management ⭕ (Pending)
-3. **Sender**: Content creation and sharing 🟡 (Basic implementation)
-4. **Recipient**: Content viewing ⭕ (Pending)
+2. **Circle Creator**: Circle management and configuration ⭕ (Pending)
+3. **Circle Member**: Content contribution and interaction ⭕ (Pending)
+4. **Content Creator**: Photo/video sharing 🟡 (Basic implementation)
 5. **Admin**: Content moderation ⭕ (Pending)
 
 ### Key Features
 1. Email/password authentication ✅ (Implemented)
-2. Friend management via contacts/search/QR ⭕ (Pending)
-3. Photo/video capture with filters 🟡 (Basic photo capture)
-4. Self-destructing content viewing ⭕ (Pending)
-5. Push notifications ⭕ (Pending)
-6. Admin moderation tools ⭕ (Pending)
+2. Circle management ⭕ (Pending)
+3. Friend management via contacts/search/QR 🟡 (Basic implementation)
+4. Photo/video capture with filters 🟡 (Basic photo capture)
+5. Collaborative Stories ⭕ (Pending)
+6. Live Reactions ⭕ (Pending)
+7. Location-Based Circles ⭕ (Pending)
+8. AR filters 🟡 (Basic UI implemented)
+9. Disappearing Chat ⭕ (Pending)
+10. Memory Vault ⭕ (Pending)
+11. Push notifications ⭕ (Pending)
+12. RAG-Enhanced features ⭕ (Pending)
 
 ## Success Criteria
 1. Successful user registration and verification ✅ (Implemented)
-2. Seamless friend connection process ⭕ (Pending)
-3. Fast and reliable snap delivery 🟡 (In progress)
-4. Automatic content expiration ⭕ (Pending)
-5. Effective abuse prevention ⭕ (Pending)
-6. GDPR compliance ⭕ (Pending)
-7. Robust offline support ⭕ (Pending)
+2. Circle creation and management ⭕ (Pending)
+3. Seamless friend connection process 🟡 (Basic implementation)
+4. Fast and reliable content delivery 🟡 (In progress)
+5. Automatic content expiration 🟡 (In progress)
+6. RAG suggestion relevance ⭕ (Pending)
+7. Engagement metrics ⭕ (Pending)
+8. Privacy protection and compliance ⭕ (Pending)
+9. Robust offline support ⭕ (Pending)
 
 ## Non-Functional Requirements
 1. Performance optimization 🟡 (In progress)
@@ -45,4 +57,6 @@ Authentication flow with email/password implemented, basic camera functionality 
 3. Privacy protection ⭕ (Pending)
 4. Scalability considerations ⭕ (Pending)
 5. Monitoring and analytics ⭕ (Pending)
-6. Crash reporting ⭕ (Pending) 
+6. Crash reporting ⭕ (Pending)
+7. RAG integration ⭕ (Pending)
+8. Multilingual support ⭕ (Pending) 

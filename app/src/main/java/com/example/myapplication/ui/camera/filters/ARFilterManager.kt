@@ -78,6 +78,13 @@ class ARFilterManager(
     }
     
     /**
+     * Clears the current filter
+     */
+    fun clearFilter() {
+        removeCurrentFilter()
+    }
+    
+    /**
      * Takes a screenshot of the current AR view
      */
     suspend fun takeScreenshot(): Uri? = withContext(Dispatchers.IO) {

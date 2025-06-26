@@ -21,6 +21,7 @@ concurrentFutures = "1.1.0"
 guava = "31.1-android"
 firebaseStorageKtx = "20.3.0"
 coil = "2.6.0"
+playServicesLocation = "21.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +55,7 @@ androidx-concurrent-futures-ktx = { group = "androidx.concurrent", name = "concu
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

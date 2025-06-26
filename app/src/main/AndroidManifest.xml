@@ -7,6 +7,10 @@
     <!-- Declare that the app doesn't require camera hardware to function -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
+    <!-- Location permissions -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
     <!-- AR related permissions and features -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />

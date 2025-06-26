@@ -9,6 +9,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.ui.auth.AuthScreen
 import com.example.myapplication.ui.camera.CameraScreen
+import com.example.myapplication.ui.camera.RecipientSelectorScreen
+import com.example.myapplication.ui.circles.CircleDetailScreen
+import com.example.myapplication.ui.circles.CirclesScreen
+import com.example.myapplication.ui.circles.CreateCircleScreen
 import com.example.myapplication.ui.friends.FriendsScreen
 import com.example.myapplication.ui.home.HomeScreen
 import com.example.myapplication.ui.snap.SnapViewerScreen
@@ -20,8 +24,14 @@ object Destinations {
     const val CAMERA = "camera"
     const val FRIENDS = "friends"
     const val SNAP_VIEWER = "snap_viewer/{snapId}"
+    const val CIRCLES = "circles"
+    const val CREATE_CIRCLE = "create_circle"
+    const val CIRCLE_DETAIL = "circle_detail/{circleId}"
+    const val CAMERA_FOR_CIRCLE = "camera_for_circle/{circleId}"
     
     fun snapViewer(snapId: String) = "snap_viewer/$snapId"
+    fun circleDetail(circleId: String) = "circle_detail/$circleId"
+    fun cameraForCircle(circleId: String) = "camera_for_circle/$circleId"
 }
 
 @Composable
@@ -51,12 +61,33 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 },
                 onOpenFriends = {
                     navController.navigate(Destinations.FRIENDS)
+                },
+                onOpenCircles = {
+                    navController.navigate(Destinations.CIRCLES)
                 }
             )
         }
         
         composable(Destinations.CAMERA) {
             CameraScreen(
+                onSnapCaptured = {
+                    navController.popBackStack()
+                },
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable(
+            route = Destinations.CAMERA_FOR_CIRCLE,
+            arguments = listOf(
+                navArgument("circleId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val circleId = backStackEntry.arguments?.getString("circleId") ?: ""
+            CameraScreen(
+                circleId = circleId,
                 onSnapCaptured = {
                     navController.popBackStack()
                 },
@@ -85,6 +116,60 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 snapId = snapId,
                 onClose = {
                     navController.popBackStack()
+                }
+            )
+        }
+        
+        // Circle screens
+        composable(Destinations.CIRCLES) {
+            CirclesScreen(
+                onCreateCircle = {
+                    navController.navigate(Destinations.CREATE_CIRCLE)
+                },
+                onCircleSelected = { circleId ->
+                    navController.navigate(Destinations.circleDetail(circleId))
+                },
+                onInvitationAction = { circleId, accepted ->
+                    // Handle invitation acceptance/rejection
+                    // If accepted, navigate to the circle
+                    if (accepted) {
+                        navController.navigate(Destinations.circleDetail(circleId))
+                    }
+                }
+            )
+        }
+        
+        composable(Destinations.CREATE_CIRCLE) {
+            CreateCircleScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onCircleCreated = { circleId ->
+                    // Navigate to the newly created circle
+                    navController.navigate(Destinations.circleDetail(circleId)) {
+                        popUpTo(Destinations.CIRCLES)
+                    }
+                }
+            )
+        }
+        
+        composable(
+            route = Destinations.CIRCLE_DETAIL,
+            arguments = listOf(
+                navArgument("circleId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val circleId = backStackEntry.arguments?.getString("circleId") ?: ""
+            CircleDetailScreen(
+                circleId = circleId,
+                onBack = {
+                    navController.popBackStack()
+                },
+                onCaptureForCircle = { selectedCircleId ->
+                    navController.navigate(Destinations.cameraForCircle(selectedCircleId))
+                },
+                onViewSnap = { snapId ->
+                    navController.navigate(Destinations.snapViewer(snapId))
                 }
             )
         }

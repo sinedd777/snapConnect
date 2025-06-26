@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -33,7 +34,8 @@ import java.util.*
 fun HomeScreen(
     onOpenCamera: () -> Unit,
     onOpenSnapViewer: (String) -> Unit = {},
-    onOpenFriends: () -> Unit = {}
+    onOpenFriends: () -> Unit = {},
+    onOpenCircles: () -> Unit = {}
 ) {
     val snapRepository = remember { SnapRepository() }
     val coroutineScope = rememberCoroutineScope()
@@ -56,7 +58,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("SnapConnect") },
+                title = { Text("SnapCircle") },
                 actions = {
                     IconButton(onClick = {
                         coroutineScope.launch {
@@ -71,6 +73,9 @@ fun HomeScreen(
                         }
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                    IconButton(onClick = { onOpenCircles() }) {
+                        Icon(Icons.Default.Groups, contentDescription = "Circles")
                     }
                     IconButton(onClick = { onOpenFriends() }) {
                         Icon(Icons.Default.Person, contentDescription = "Friends")
@@ -123,6 +128,9 @@ fun HomeScreen(
                     Button(onClick = onOpenCamera) {
                         Text("Take a Snap")
                     }
+                    Button(onClick = onOpenCircles) {
+                        Text("Explore Circles")
+                    }
                     Button(onClick = onOpenFriends) {
                         Text("Add Friends")
                     }
@@ -133,6 +141,23 @@ fun HomeScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    item {
+                        Button(
+                            onClick = onOpenCircles,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Groups, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("My Circles")
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Recent Snaps",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    
                     items(snaps) { snap ->
                         SnapItem(
                             snap = snap,
