@@ -13,6 +13,11 @@ import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import com.google.firebase.firestore.GeoPoint
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.firestore.DocumentSnapshot
+import com.firebase.geofire.GeoFireUtils
+import com.firebase.geofire.GeoLocation
 
 class CircleRepository {
     private val firestore: FirebaseFirestore = Firebase.firestore
@@ -61,6 +66,11 @@ class CircleRepository {
                 initialMembers + currentUserId
             }
             
+            // Generate geohash if location is enabled
+            val geohash = if (locationEnabled && locationLat != null && locationLng != null) {
+                GeoFireUtils.getGeoHashForLocation(GeoLocation(locationLat, locationLng))
+            } else null
+            
             // Create Circle object
             val circle = Circle(
                 name = name,
@@ -73,7 +83,8 @@ class CircleRepository {
                 locationLat = locationLat,
                 locationLng = locationLng,
                 locationRadius = locationRadius,
-                isPrivate = isPrivate
+                isPrivate = isPrivate,
+                geohash = geohash
             )
             
             // Save to Firestore
@@ -399,20 +410,45 @@ class CircleRepository {
         return try {
             val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
             
-            // In a real app, we would use geospatial queries to find circles within the radius
-            // For now, we'll just return all public circles and sort them by creation date
-            val circleDocs = firestore.collection(CIRCLES_COLLECTION)
-                .whereEqualTo("isPrivate", false)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
-                .limit(limit)
-                .get()
-                .await()
-                
-            val circles = circleDocs.documents.mapNotNull { doc ->
-                val data = doc.data ?: return@mapNotNull null
+            // Convert radius to meters
+            val radiusInM = radiusKm * 1000
+            
+            // Get the geohash query bounds
+            val center = GeoLocation(lat, lng)
+            val bounds = GeoFireUtils.getGeoHashQueryBounds(center, radiusInM)
+            
+            // Create a list to hold all query tasks
+            val tasks = bounds.map { bound ->
+                firestore.collection(CIRCLES_COLLECTION)
+                    .whereEqualTo("isPrivate", false)
+                    .orderBy("geohash")
+                    .startAt(bound.startHash)
+                    .endAt(bound.endHash)
+                    .get()
+            }
+            
+            // Wait for all queries to complete
+            val snapshots = tasks.map { it.await() }
+            
+            // Merge results and filter by actual distance
+            val matchingDocs = snapshots.flatMap { snapshot ->
+                snapshot.documents.filter { doc ->
+                    val lat = doc.getDouble("locationLat") ?: return@filter false
+                    val lng = doc.getDouble("locationLng") ?: return@filter false
+                    
+                    // We have to filter out a few false positives due to GeoHash accuracy
+                    val docLocation = GeoLocation(lat, lng)
+                    val distanceInM = GeoFireUtils.getDistanceBetween(docLocation, center)
+                    distanceInM <= radiusInM
+                }
+            }
+            
+            // Convert to Circle objects
+            val circles = matchingDocs.map { doc ->
+                val data = doc.data ?: return@map null
                 data["id"] = doc.id
                 Circle.fromMap(data)
-            }
+            }.filterNotNull()
             
             Result.success(circles)
         } catch (e: Exception) {

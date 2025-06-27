@@ -54,6 +54,8 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.DurationUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +79,10 @@ fun HomeScreen(
     
     // Fullscreen map state
     var isMapFullscreen by remember { mutableStateOf(false) }
+    
+    // Bottom sheet state
+    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    var showBottomSheet by remember { mutableStateOf(false) }
     
     // Animation values
     val mapHeight by animateDpAsState(
@@ -174,6 +180,15 @@ fun HomeScreen(
         onOpenSnapViewer(circleId) // For now, reuse the snap viewer navigation
     }
     
+    // Show bottom sheet when circles are loaded and not in fullscreen mode
+    LaunchedEffect(viewModel.circles, isMapFullscreen) {
+        if (viewModel.circles.isNotEmpty() && !isMapFullscreen) {
+            showBottomSheet = true
+        } else {
+            showBottomSheet = false
+        }
+    }
+    
     Scaffold(
         topBar = {
             if (!isMapFullscreen) {
@@ -251,220 +266,372 @@ fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(if (isMapFullscreen) PaddingValues(0.dp) else padding)
         ) {
-            // Map header
-            if (!isMapFullscreen) {
-                Row(
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                // Map header
+                if (!isMapFullscreen) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Nearby Circles",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+                
+                // Map preview
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .height(mapHeight)
+                        .padding(horizontal = mapPadding)
+                        .clip(RoundedCornerShape(mapCornerRadius))
+                        .zIndex(1f),
+                    shape = RoundedCornerShape(mapCornerRadius)
                 ) {
-                    Text(
-                        text = "Nearby Circles",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
-            
-            // Map preview
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(mapHeight)
-                    .padding(horizontal = mapPadding)
-                    .clip(RoundedCornerShape(mapCornerRadius))
-                    .zIndex(1f),
-                shape = RoundedCornerShape(mapCornerRadius)
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (viewModel.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    } else {
-                        OSMMapComponent(
-                            circles = viewModel.circles,
-                            userLat = viewModel.userLat,
-                            userLng = viewModel.userLng,
-                            onCircleClick = { /* Handle in full map view */ },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    
-                    // Map overlay
-                    if (!isMapFullscreen) {
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = "${viewModel.circles.size} Circles nearby",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (viewModel.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.align(Alignment.Center)
                             )
-                            
-                            if (viewModel.collegeTown != null) {
-                                Text(
-                                    text = "College Town: ${viewModel.collegeTown}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            
-                            if (viewModel.userLat != null && viewModel.userLng != null) {
-                                Text(
-                                    text = "Location: ${String.format("%.5f", viewModel.userLat)}, ${String.format("%.5f", viewModel.userLng)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Location button overlay
-                    if (!viewModel.isLoading) {
-                        FloatingActionButton(
-                            onClick = { 
-                                if (viewModel.isLocationPermissionGranted) {
-                                    viewModel.requestLocationUpdate(context)
-                                } else {
-                                    locationPermissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
-                                    )
-                                }
-                            },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .size(40.dp),
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Icon(
-                                Icons.Default.MyLocation,
-                                contentDescription = "My Location",
-                                modifier = Modifier.size(20.dp)
+                        } else {
+                            OSMMapComponent(
+                                circles = viewModel.circles,
+                                userLat = viewModel.userLat,
+                                userLng = viewModel.userLng,
+                                onCircleClick = { /* Handle in full map view */ },
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                         
-                        // Full map button
-                        FloatingActionButton(
-                            onClick = { isMapFullscreen = !isMapFullscreen },
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(8.dp)
-                                .size(40.dp),
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Icon(
-                                if (isMapFullscreen) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
-                                contentDescription = if (isMapFullscreen) "Exit Full Screen" else "View Full Map",
-                                modifier = Modifier.size(20.dp)
+                        // Location button overlay
+                        if (!viewModel.isLoading) {
+                            FloatingActionButton(
+                                onClick = { 
+                                    if (viewModel.isLocationPermissionGranted) {
+                                        viewModel.requestLocationUpdate(context)
+                                    } else {
+                                        locationPermissionLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(40.dp),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) {
+                                Icon(
+                                    Icons.Default.MyLocation,
+                                    contentDescription = "My Location",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            
+                            // Full map button
+                            FloatingActionButton(
+                                onClick = { isMapFullscreen = !isMapFullscreen },
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(8.dp)
+                                    .size(40.dp),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) {
+                                Icon(
+                                    if (isMapFullscreen) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                                    contentDescription = if (isMapFullscreen) "Exit Full Screen" else "View Full Map",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        
+                        // Back button when in fullscreen mode
+                        if (isMapFullscreen) {
+                            FloatingActionButton(
+                                onClick = { isMapFullscreen = false },
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(8.dp)
+                                    .size(40.dp),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) {
+                                Icon(
+                                    Icons.Default.ArrowBack,
+                                    contentDescription = "Back",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Content below map (only visible when not fullscreen)
+                if (!isMapFullscreen) {
+                    // Filter chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        filterOptions.forEach { filter ->
+                            FilterChip(
+                                selected = selectedFilter == filter,
+                                onClick = { selectedFilter = filter },
+                                label = { Text(filter) },
+                                leadingIcon = if (selectedFilter == filter) {
+                                    { Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp)) }
+                                } else null
                             )
                         }
                     }
                     
-                    // Back button when in fullscreen mode
-                    if (isMapFullscreen) {
-                        FloatingActionButton(
-                            onClick = { isMapFullscreen = false },
+                    // Empty state if no circles
+                    if (viewModel.circles.isEmpty()) {
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(8.dp)
-                                .size(40.dp),
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = "Back",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            if (viewModel.isLoading) {
+                                CircularProgressIndicator()
+                            } else {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = "No circles found nearby",
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(onClick = onCreateCircle) {
+                                        Text("Create a Circle")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
             
-            // Content below map (only visible when not fullscreen)
-            if (!isMapFullscreen) {
-                // Filter chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    filterOptions.forEach { filter ->
-                        FilterChip(
-                            selected = selectedFilter == filter,
-                            onClick = { selectedFilter = filter },
-                            label = { Text(filter) },
-                            leadingIcon = if (selectedFilter == filter) {
-                                { Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp)) }
-                            } else null
-                        )
-                    }
-                }
-                
-                // Circle list
-                Text(
-                    text = "Recent Circles",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-                
-                if (viewModel.circles.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (viewModel.isLoading) {
-                            CircularProgressIndicator()
-                        } else {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = "No circles found nearby",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(onClick = onCreateCircle) {
-                                    Text("Create a Circle")
-                                }
-                            }
+            // Bottom Sheet for Circles
+            if (showBottomSheet && !isMapFullscreen && viewModel.circles.isNotEmpty()) {
+                ModalBottomSheet(
+                    onDismissRequest = { showBottomSheet = false },
+                    sheetState = bottomSheetState,
+                    dragHandle = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Drag handle
+                            Box(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(4.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                        RoundedCornerShape(2.dp)
+                                    )
+                                    .padding(vertical = 16.dp)
+                            )
+                            
+                            // Title
+                            Text(
+                                text = "Nearby Circles",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
                         }
                     }
-                } else {
+                ) {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 32.dp), // Extra padding at the bottom
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(viewModel.circles) { circle ->
-                            CircleListItem(
+                            CircleBottomSheetItem(
                                 circle = circle,
                                 onClick = { onOpenCircleDetail(circle.id) }
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CircleBottomSheetItem(
+    circle: Circle,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (circle.isPrivate) 
+                MaterialTheme.colorScheme.secondaryContainer 
+            else 
+                MaterialTheme.colorScheme.primaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Circle icon with category-based icon
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (circle.isPrivate) 
+                            MaterialTheme.colorScheme.secondary 
+                        else 
+                            MaterialTheme.colorScheme.primary
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = when (circle.category) {
+                        "Party" -> Icons.Default.Celebration
+                        "Study" -> Icons.Default.School
+                        "Sports" -> Icons.Default.SportsSoccer
+                        "Food" -> Icons.Default.Restaurant
+                        "Music" -> Icons.Default.MusicNote
+                        else -> Icons.Default.Groups
+                    },
+                    contentDescription = null,
+                    tint = if (circle.isPrivate) 
+                        MaterialTheme.colorScheme.onSecondary 
+                    else 
+                        MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            // Circle info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = circle.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Time-related message
+                val timeMessage = getTimeMessage(circle)
+                Text(
+                    text = timeMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        timeMessage.contains("Starting") -> MaterialTheme.colorScheme.tertiary
+                        timeMessage.contains("Ends") -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Participants count
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${circle.members.size} participants",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    if (circle.locationEnabled && circle.locationRadius != null) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${circle.locationRadius.toInt()}m radius",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            // Privacy indicator and action button
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.height(56.dp)
+            ) {
+                Icon(
+                    imageVector = if (circle.isPrivate) Icons.Default.Lock else Icons.Default.Public,
+                    contentDescription = if (circle.isPrivate) "Private" else "Public",
+                    tint = if (circle.isPrivate) 
+                        MaterialTheme.colorScheme.onSecondaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                
+                FilledTonalIconButton(
+                    onClick = onClick,
+                    modifier = Modifier.size(32.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = if (circle.isPrivate) 
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f) 
+                        else 
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "View Circle",
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }
@@ -549,4 +716,41 @@ fun CircleListItem(
             }
         }
     }
+}
+
+// Helper function to get time-related message
+fun getTimeMessage(circle: Circle): String {
+    val now = System.currentTimeMillis()
+    
+    // Check if the circle has a start time in the future
+    if (circle.startTime != null && circle.startTime.toDate().time > now) {
+        val diffMillis = circle.startTime.toDate().time - now
+        val diffMinutes = diffMillis / (1000 * 60)
+        
+        return when {
+            diffMinutes < 60 -> "Starting in ${diffMinutes.toInt()} minutes"
+            diffMinutes < 24 * 60 -> "Starting in ${(diffMinutes / 60).toInt()} hours"
+            else -> "Starting on ${SimpleDateFormat("MMM d", Locale.getDefault()).format(circle.startTime.toDate())}"
+        }
+    }
+    
+    // Check if the circle has an expiration time
+    if (circle.expiresAt != null) {
+        val diffMillis = circle.expiresAt.toDate().time - now
+        
+        // If already expired
+        if (diffMillis <= 0) {
+            return "Expired"
+        }
+        
+        val diffMinutes = diffMillis / (1000 * 60)
+        return when {
+            diffMinutes < 60 -> "Ends in ${diffMinutes.toInt()} minutes"
+            diffMinutes < 24 * 60 -> "Ends in ${(diffMinutes / 60).toInt()} hours"
+            else -> "Ends on ${SimpleDateFormat("MMM d", Locale.getDefault()).format(circle.expiresAt.toDate())}"
+        }
+    }
+    
+    // If no start time or expiration time
+    return "Active now"
 } 

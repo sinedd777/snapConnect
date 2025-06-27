@@ -141,6 +141,9 @@ dependencies {
     implementation("org.osmdroid:osmdroid-wms:6.1.16")
     implementation("androidx.preference:preference-ktx:1.2.1")
     
+    // GeoFire for location-based queries
+    implementation("com.firebase:geofire-android-common:3.2.0")
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

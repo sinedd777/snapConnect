@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.location.Location
 import android.content.Context
+import android.annotation.SuppressLint
+import android.util.Log
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -60,6 +62,9 @@ class HomeViewModel : ViewModel() {
     var isLocationEnabled by mutableStateOf(false)
         private set
     
+    // Debug flag
+    private val isDebugMode = false
+    
     init {
         loadUserProfile()
     }
@@ -83,6 +88,9 @@ class HomeViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 // Ignore error, location will stay null
+                if (isDebugMode) {
+                    Log.e("HomeViewModel", "Error loading user profile: ${e.message}")
+                }
             }
         }
     }
@@ -98,6 +106,12 @@ class HomeViewModel : ViewModel() {
                 val lat = userLat ?: 37.7749
                 val lng = userLng ?: -122.4194
                 
+                if (isDebugMode) {
+                    Log.d("HomeViewModel", "Loading circles with location: $lat, $lng")
+                    Log.d("HomeViewModel", "College town: $collegeTown")
+                    Log.d("HomeViewModel", "Current filter: $currentFilter")
+                }
+                
                 // If we have a college town, prioritize that for fetching circles
                 val result = if (collegeTown != null) {
                     circleRepository.getCollegeTownCircles(collegeTown!!)
@@ -107,6 +121,13 @@ class HomeViewModel : ViewModel() {
                 
                 if (result.isSuccess) {
                     val allCircles = result.getOrNull() ?: emptyList()
+                    
+                    if (isDebugMode) {
+                        Log.d("HomeViewModel", "Loaded ${allCircles.size} circles")
+                        allCircles.forEach { circle ->
+                            Log.d("HomeViewModel", "Circle: ${circle.name}, lat: ${circle.locationLat}, lng: ${circle.locationLng}")
+                        }
+                    }
                     
                     // Apply filter
                     circles = when (currentFilter) {
@@ -122,13 +143,66 @@ class HomeViewModel : ViewModel() {
                         "Study" -> allCircles.filter { it.category == "Study" }
                         else -> allCircles
                     }
+                    
+                    // If no circles found and we're in debug mode, create some test circles
+                    if (circles.isEmpty() && isDebugMode) {
+                        createTestCirclesIfNeeded(lat, lng)
+                    }
                 } else {
                     errorMessage = result.exceptionOrNull()?.message ?: "Failed to load nearby circles"
+                    if (isDebugMode) {
+                        Log.e("HomeViewModel", "Error loading circles: $errorMessage")
+                    }
                 }
             } catch (e: Exception) {
                 errorMessage = e.message ?: "Unknown error occurred"
+                if (isDebugMode) {
+                    Log.e("HomeViewModel", "Exception loading circles: ${e.message}")
+                }
             } finally {
                 isLoading = false
+            }
+        }
+    }
+    
+    // Create test circles for debugging purposes
+    private fun createTestCirclesIfNeeded(lat: Double, lng: Double) {
+        if (!isDebugMode) return
+        
+        viewModelScope.launch {
+            try {
+                Log.d("HomeViewModel", "Creating test circles near: $lat, $lng")
+                
+                // Create a test circle at the user's location
+                val circle1 = circleRepository.createCircle(
+                    name = "Test Circle 1",
+                    description = "A test circle for debugging",
+                    durationMillis = CircleRepository.DURATION_24_HOURS,
+                    isPrivate = false,
+                    locationEnabled = true,
+                    locationLat = lat,
+                    locationLng = lng,
+                    locationRadius = 100.0
+                )
+                
+                // Create another test circle nearby
+                val circle2 = circleRepository.createCircle(
+                    name = "Test Circle 2",
+                    description = "Another test circle for debugging",
+                    durationMillis = CircleRepository.DURATION_48_HOURS,
+                    isPrivate = true,
+                    locationEnabled = true,
+                    locationLat = lat + 0.002, // Slightly north
+                    locationLng = lng + 0.002, // Slightly east
+                    locationRadius = 150.0
+                )
+                
+                // Reload circles after creating test data
+                loadNearbyCircles()
+                
+                Log.d("HomeViewModel", "Created test circles successfully")
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error creating test circles: ${e.message}")
             }
         }
     }
@@ -140,6 +214,7 @@ class HomeViewModel : ViewModel() {
     }
     
     // Request location update from the device
+    @SuppressLint("MissingPermission")
     fun requestLocationUpdate(context: Context) {
         viewModelScope.launch {
             try {
@@ -157,6 +232,9 @@ class HomeViewModel : ViewModel() {
                             cancellationToken.token
                         ).await()
                     } catch (e: Exception) {
+                        if (isDebugMode) {
+                            Log.e("HomeViewModel", "Error getting current location: ${e.message}")
+                        }
                         null
                     }
                 }
@@ -167,6 +245,10 @@ class HomeViewModel : ViewModel() {
                     userLng = location.longitude
                     isLocationEnabled = true
                     
+                    if (isDebugMode) {
+                        Log.d("HomeViewModel", "Got location update: ${location.latitude}, ${location.longitude}")
+                    }
+                    
                     // Update the user's location in Firestore
                     updateUserLocation(location.latitude, location.longitude)
                 } ?: run {
@@ -175,6 +257,9 @@ class HomeViewModel : ViewModel() {
                         try {
                             fusedLocationClient.lastLocation.await()
                         } catch (e: Exception) {
+                            if (isDebugMode) {
+                                Log.e("HomeViewModel", "Error getting last location: ${e.message}")
+                            }
                             null
                         }
                     }
@@ -184,10 +269,17 @@ class HomeViewModel : ViewModel() {
                         userLng = location.longitude
                         isLocationEnabled = true
                         
+                        if (isDebugMode) {
+                            Log.d("HomeViewModel", "Using last known location: ${location.latitude}, ${location.longitude}")
+                        }
+                        
                         // Update the user's location in Firestore
                         updateUserLocation(location.latitude, location.longitude)
                     } ?: run {
                         errorMessage = "Could not get location. Please check your location settings."
+                        if (isDebugMode) {
+                            Log.e("HomeViewModel", "No location available")
+                        }
                     }
                 }
                 
@@ -195,6 +287,9 @@ class HomeViewModel : ViewModel() {
                 loadNearbyCircles()
             } catch (e: Exception) {
                 errorMessage = e.message ?: "Unknown error occurred"
+                if (isDebugMode) {
+                    Log.e("HomeViewModel", "Exception updating location: ${e.message}")
+                }
             } finally {
                 isLoading = false
             }
@@ -212,12 +307,20 @@ class HomeViewModel : ViewModel() {
                 val result = mapRepository.updateUserLocation(lat, lng)
                 if (result.isFailure) {
                     errorMessage = result.exceptionOrNull()?.message ?: "Failed to update location"
+                    if (isDebugMode) {
+                        Log.e("HomeViewModel", "Error updating user location: $errorMessage")
+                    }
+                } else if (isDebugMode) {
+                    Log.d("HomeViewModel", "Updated user location in Firestore")
                 }
                 
                 // Reload circles with new location
                 loadNearbyCircles()
             } catch (e: Exception) {
                 errorMessage = e.message ?: "Unknown error occurred"
+                if (isDebugMode) {
+                    Log.e("HomeViewModel", "Exception updating user location: ${e.message}")
+                }
             }
         }
     }

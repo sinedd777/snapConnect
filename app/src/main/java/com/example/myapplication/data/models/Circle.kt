@@ -24,7 +24,8 @@ data class Circle(
     val inviteCode: String? = null,
     val category: String? = null,
     val arFilterId: String? = null,
-    val collegeTown: String? = null
+    val collegeTown: String? = null,
+    val geohash: String? = null
 ) {
     companion object {
         fun fromMap(map: Map<String, Any>): Circle {
@@ -46,7 +47,8 @@ data class Circle(
                 inviteCode = map["inviteCode"] as? String,
                 category = map["category"] as? String,
                 arFilterId = map["arFilterId"] as? String,
-                collegeTown = map["collegeTown"] as? String
+                collegeTown = map["collegeTown"] as? String,
+                geohash = map["geohash"] as? String
             )
         }
     }

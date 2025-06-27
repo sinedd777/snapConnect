@@ -6,115 +6,165 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import androidx.core.content.ContextCompat
+import com.example.myapplication.R
 import com.example.myapplication.data.models.Circle
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
 /**
- * Custom marker for displaying Circle pins on the map
+ * Custom marker for displaying Circles on the map
  */
 class CircleMarker(
-    private val osmMapView: MapView,
+    osmMapView: MapView,
     val circle: Circle,
-    private val isSelected: Boolean = false
+    val isSelected: Boolean = false
 ) : Marker(osmMapView) {
-    
-    private var pinSize: Float = 0f
-    private val paint = Paint().apply {
-        isAntiAlias = true
-        style = Paint.Style.FILL
-    }
-    private val strokePaint = Paint().apply {
-        isAntiAlias = true
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
-        color = Color.WHITE
-    }
-    
+
     init {
-        position = GeoPoint(circle.locationLat ?: 0.0, circle.locationLng ?: 0.0)
+        position = GeoPoint(
+            circle.locationLat ?: 0.0,
+            circle.locationLng ?: 0.0
+        )
+        
+        // Set title and snippet
         title = circle.name
-        snippet = circle.description
-        
-        // Calculate pin size based on member count
-        val baseSize = 20f
-        val memberBonus = (circle.members.size * 0.5f).coerceAtMost(30f)
-        pinSize = baseSize + memberBonus
-        
-        // Set the pin color based on privacy
-        paint.color = if (circle.isPrivate) {
-            Color.parseColor("#E91E63") // Pink for private
-        } else {
-            Color.parseColor("#4CAF50") // Green for public
+        snippet = when {
+            circle.members.size == 1 -> "1 participant"
+            else -> "${circle.members.size} participants"
         }
         
-        // Highlight if selected
-        if (isSelected) {
-            strokePaint.color = Color.YELLOW
-            strokePaint.strokeWidth = 5f
-        }
+        // Set marker appearance
+        setAnchor(ANCHOR_CENTER, ANCHOR_BOTTOM)
+        
+        // Customize marker based on Circle properties
+        val markerSize = calculateMarkerSize(circle.members.size)
+        val markerColor = if (circle.isPrivate) PRIVATE_COLOR else PUBLIC_COLOR
+        val markerStrokeColor = if (isSelected) SELECTED_STROKE_COLOR else DEFAULT_STROKE_COLOR
+        
+        // Create custom marker icon
+        icon = createMarkerIcon(
+            osmMapView.context,
+            markerSize,
+            markerColor,
+            markerStrokeColor,
+            circle.category
+        )
     }
     
     /**
-     * Draw the custom marker
+     * Calculate marker size based on number of members
      */
-    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
-        if (shadow) return
+    private fun calculateMarkerSize(memberCount: Int): Float {
+        // Base size + additional size based on member count
+        return BASE_SIZE + (memberCount * MEMBER_SIZE_FACTOR).coerceAtMost(MAX_ADDITIONAL_SIZE)
+    }
+    
+    /**
+     * Create a custom marker icon
+     */
+    private fun createMarkerIcon(
+        context: Context,
+        size: Float,
+        color: Int,
+        strokeColor: Int,
+        category: String?
+    ): Drawable? {
+        // For now, we'll use a simple circle drawable
+        // In a real app, you might want to create a more complex drawable based on category
+        return CircleDrawable(size, color, strokeColor, category)
+    }
+    
+    companion object {
+        // Marker appearance constants
+        private const val BASE_SIZE = 30f
+        private const val MEMBER_SIZE_FACTOR = 2f
+        private const val MAX_ADDITIONAL_SIZE = 30f
         
-        // Get the screen coordinates for this marker
-        val point = mapView.projection.toPixels(position, null)
+        // Colors
+        private val PUBLIC_COLOR = Color.parseColor("#6200EE")
+        private val PRIVATE_COLOR = Color.parseColor("#03DAC5")
+        private val DEFAULT_STROKE_COLOR = Color.WHITE
+        private val SELECTED_STROKE_COLOR = Color.YELLOW
+    }
+    
+    /**
+     * Custom drawable for Circle markers
+     */
+    private class CircleDrawable(
+        private val size: Float,
+        private val color: Int,
+        private val strokeColor: Int,
+        private val category: String?
+    ) : Drawable() {
         
-        // Draw the circle pin
-        canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), pinSize, paint)
+        private val paint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.FILL
+            color = this@CircleDrawable.color
+        }
         
-        // Draw the stroke
-        canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), pinSize, strokePaint)
+        private val strokePaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+            color = strokeColor
+        }
         
-        // Draw the first letter of the circle name
-        if (circle.name.isNotEmpty()) {
-            val textPaint = Paint().apply {
-                isAntiAlias = true
-                color = Color.WHITE
-                textSize = pinSize * 0.8f
-                textAlign = Paint.Align.CENTER
+        override fun draw(canvas: Canvas) {
+            val centerX = bounds.width() / 2f
+            val centerY = bounds.height() / 2f
+            val radius = size / 2f
+            
+            // Draw the circle
+            canvas.drawCircle(centerX, centerY, radius, paint)
+            canvas.drawCircle(centerX, centerY, radius, strokePaint)
+            
+            // Draw category indicator if available
+            category?.let {
+                // This could be extended to draw different icons based on category
+                // For now, we'll just use a different color in the center
+                val categoryPaint = Paint().apply {
+                    isAntiAlias = true
+                    style = Paint.Style.FILL
+                    color = getCategoryColor(it)
+                }
+                canvas.drawCircle(centerX, centerY, radius / 3f, categoryPaint)
             }
-            
-            val letter = circle.name.first().toString()
-            val textHeight = textPaint.descent() - textPaint.ascent()
-            val textOffset = (textHeight / 2) - textPaint.descent()
-            
-            canvas.drawText(
-                letter,
-                point.x.toFloat(),
-                point.y.toFloat() + textOffset,
-                textPaint
-            )
-        }
-    }
-    
-    /**
-     * Handle marker click
-     */
-    override fun onMarkerClickDefault(marker: Marker, mapView: MapView): Boolean {
-        // Show info window with circle details
-        showInfoWindow()
-        return true
-    }
-    
-    /**
-     * Set the marker as selected
-     */
-    fun setSelected(selected: Boolean) {
-        if (selected) {
-            strokePaint.color = Color.YELLOW
-            strokePaint.strokeWidth = 5f
-        } else {
-            strokePaint.color = Color.WHITE
-            strokePaint.strokeWidth = 3f
         }
         
-        // Force redraw
-        osmMapView.invalidate()
+        private fun getCategoryColor(category: String): Int {
+            return when (category.lowercase()) {
+                "party" -> Color.parseColor("#FF4081")
+                "study" -> Color.parseColor("#2196F3")
+                "sports" -> Color.parseColor("#4CAF50")
+                "food" -> Color.parseColor("#FF9800")
+                "music" -> Color.parseColor("#9C27B0")
+                else -> Color.parseColor("#607D8B")
+            }
+        }
+        
+        override fun setAlpha(alpha: Int) {
+            paint.alpha = alpha
+            strokePaint.alpha = alpha
+        }
+        
+        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+            paint.colorFilter = colorFilter
+            strokePaint.colorFilter = colorFilter
+        }
+        
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int {
+            return android.graphics.PixelFormat.TRANSLUCENT
+        }
+        
+        override fun getIntrinsicWidth(): Int {
+            return size.toInt() * 2
+        }
+        
+        override fun getIntrinsicHeight(): Int {
+            return size.toInt() * 2
+        }
     }
 } 

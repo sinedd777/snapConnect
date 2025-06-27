@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Development Phase
-Pivoting from individual snap sharing to map-based, college-focused Circle platform. Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning to map-based interface with college town selection and RAG integration. UI enhanced with Material 3 design system.
+Pivoting from individual snap sharing to map-based, college-focused Circle platform. Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning to map-based interface with college town selection and RAG integration. UI enhanced with Material 3 design system. Map functionality with location services implemented, including fullscreen mode and circle display.
 
 ## Product Pivot
 We are pivoting the app to focus on:
@@ -41,6 +41,7 @@ We are pivoting the app to focus on:
    - Snap document permissions
    - Friendship document rules
    - Circle document permissions
+   - Location update permissions
 5. Created Firestore indexes:
    - Composite index for querying snaps by recipients with ordering
    - Composite index for querying snaps by circleId with ordering
@@ -68,6 +69,9 @@ We are pivoting the app to focus on:
    - Added filter controls for Circle discovery
    - Integrated location permissions handling
    - Created MapRepository for location-based operations
+   - Added fullscreen map mode with animations
+   - Implemented circle display with bottom sheet information
+   - Added real-time location updates
 10. Added college town selection:
     - Implemented CollegeTownSelectionScreen
     - Created CollegeTownViewModel with location detection
@@ -78,6 +82,8 @@ We are pivoting the app to focus on:
     - Implemented radius controls for location-based Circles
     - Added public/private options for Circle visibility
     - Integrated with map-based discovery
+    - Made location enabled by default
+    - Added permission handling during circle creation
 
 ## Active Focus Areas
 1. RAG integration for content enhancement
@@ -151,6 +157,8 @@ We are pivoting the app to focus on:
 10. RAG API integration (evaluating options)
 11. Material 3 for consistent design system
 12. OAuth providers for authentication
+13. Google Play Services for location updates
+14. Material 3 bottom sheets for circle information
 
 ## Core Workflows
 1. Map Rendering and Circle Display:
@@ -159,12 +167,15 @@ We are pivoting the app to focus on:
    - Retrieve active/upcoming Circles from database
    - Calculate Circle pin sizes based on participant count
    - Render map with pins, update every 5 seconds
+   - Display circle details in bottom sheet when selected
+   - Toggle between normal and fullscreen map modes
 2. Circle Creation and Management:
    - Store Circle details in database
    - Validate location within 1 km radius using geofencing
    - Generate unique invite code for private Circles
    - Update Circle size on map as users join
    - Schedule auto-deletion post-expiration
+   - Require location permissions for circle creation
 3. Snap Processing:
    - Validate format/size (≤30 secs video, ≤280 chars text)
    - Apply selected AR filter
