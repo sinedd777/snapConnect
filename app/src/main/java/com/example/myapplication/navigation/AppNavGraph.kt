@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.ui.auth.AuthScreen
+import com.example.myapplication.ui.auth.CollegeTownSelectionScreen
 import com.example.myapplication.ui.camera.CameraScreen
 import com.example.myapplication.ui.camera.RecipientSelectorScreen
 import com.example.myapplication.ui.circles.CircleDetailScreen
@@ -15,6 +16,7 @@ import com.example.myapplication.ui.circles.CirclesScreen
 import com.example.myapplication.ui.circles.CreateCircleScreen
 import com.example.myapplication.ui.friends.FriendsScreen
 import com.example.myapplication.ui.home.HomeScreen
+import com.example.myapplication.ui.map.CircleMapScreen
 import com.example.myapplication.ui.profile.ProfileScreen
 import com.example.myapplication.ui.snap.SnapViewerScreen
 import com.google.firebase.auth.FirebaseAuth
@@ -30,6 +32,8 @@ object Destinations {
     const val CIRCLE_DETAIL = "circle_detail/{circleId}"
     const val CAMERA_FOR_CIRCLE = "camera_for_circle/{circleId}"
     const val PROFILE = "profile"
+    const val MAP = "map"
+    const val COLLEGE_TOWN_SELECTION = "college_town_selection"
     
     fun snapViewer(snapId: String) = "snap_viewer/$snapId"
     fun circleDetail(circleId: String) = "circle_detail/$circleId"
@@ -46,11 +50,16 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 
     NavHost(navController = navController, startDestination = startDest) {
         composable(Destinations.AUTH) {
-            AuthScreen(onAuthSuccess = {
-                navController.navigate(Destinations.HOME) {
-                    popUpTo(Destinations.AUTH) { inclusive = true }
+            AuthScreen(
+                onAuthSuccess = {
+                    navController.navigate(Destinations.HOME) {
+                        popUpTo(Destinations.AUTH) { inclusive = true }
+                    }
+                },
+                onNavigateToCollegeTownSelection = {
+                    navController.navigate(Destinations.COLLEGE_TOWN_SELECTION)
                 }
-            })
+            )
         }
         
         composable(Destinations.HOME) {
@@ -69,6 +78,12 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 },
                 onOpenProfile = {
                     navController.navigate(Destinations.PROFILE)
+                },
+                onCreateCircle = {
+                    navController.navigate(Destinations.CREATE_CIRCLE)
+                },
+                onOpenMap = {
+                    navController.navigate(Destinations.MAP)
                 }
             )
         }
@@ -190,6 +205,37 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 },
                 onViewSnap = { snapId ->
                     navController.navigate(Destinations.snapViewer(snapId))
+                }
+            )
+        }
+
+        // Add the map screen route
+        composable(Destinations.MAP) {
+            CircleMapScreen(
+                onCircleClick = { circle ->
+                    navController.navigate(Destinations.circleDetail(circle.id))
+                },
+                onCreateCircle = {
+                    navController.navigate(Destinations.CREATE_CIRCLE)
+                },
+                onFilterChange = { /* Filter handled in ViewModel */ },
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Add the college town selection route
+        composable(Destinations.COLLEGE_TOWN_SELECTION) {
+            CollegeTownSelectionScreen(
+                onCollegeTownSelected = { collegeTown ->
+                    // Save the college town and navigate to home
+                    navController.navigate(Destinations.HOME) {
+                        popUpTo(Destinations.AUTH) { inclusive = true }
+                    }
+                },
+                onBackPressed = {
+                    navController.popBackStack()
                 }
             )
         }

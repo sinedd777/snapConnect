@@ -119,6 +119,9 @@ service cloud.firestore {
       allow delete: if request.auth != null && 
                      resource.data.creatorId == request.auth.uid;
       
+      // Allow listing all circles for authenticated users
+      allow list: if request.auth != null;
+      
       // Helper function to check if only member-related fields are being updated
       function onlyUpdatingMemberFields() {
         let allowedFields = ['members'];

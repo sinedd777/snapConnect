@@ -386,4 +386,66 @@ class CircleRepository {
             Result.failure(e)
         }
     }
+    
+    /**
+     * Get nearby Circles based on location and radius
+     */
+    suspend fun getNearbyCircles(
+        lat: Double,
+        lng: Double,
+        radiusKm: Double = 1.0,
+        limit: Long = 50
+    ): Result<List<Circle>> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
+            
+            // In a real app, we would use geospatial queries to find circles within the radius
+            // For now, we'll just return all public circles and sort them by creation date
+            val circleDocs = firestore.collection(CIRCLES_COLLECTION)
+                .whereEqualTo("isPrivate", false)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(limit)
+                .get()
+                .await()
+                
+            val circles = circleDocs.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                data["id"] = doc.id
+                Circle.fromMap(data)
+            }
+            
+            Result.success(circles)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Get Circles for a specific college town
+     */
+    suspend fun getCollegeTownCircles(
+        collegeTown: String,
+        limit: Long = 50
+    ): Result<List<Circle>> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
+            
+            val circleDocs = firestore.collection(CIRCLES_COLLECTION)
+                .whereEqualTo("collegeTown", collegeTown)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(limit)
+                .get()
+                .await()
+                
+            val circles = circleDocs.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                data["id"] = doc.id
+                Circle.fromMap(data)
+            }
+            
+            Result.success(circles)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 } 

@@ -7,15 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.outlined.Camera
 import androidx.compose.material.icons.outlined.Groups
@@ -28,12 +26,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.data.models.Snap
-import com.example.myapplication.data.repositories.SnapRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.myapplication.data.models.Circle
+import com.example.myapplication.data.repositories.CircleRepository
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
@@ -42,318 +42,241 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.horizontalScroll
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onOpenCamera: () -> Unit,
-    onOpenSnapViewer: (String) -> Unit = {},
-    onOpenFriends: () -> Unit = {},
-    onOpenCircles: () -> Unit = {},
-    onOpenProfile: () -> Unit = {}
+    onOpenSnapViewer: (String) -> Unit,
+    onOpenFriends: () -> Unit,
+    onOpenCircles: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onCreateCircle: () -> Unit,
+    onOpenMap: () -> Unit,
+    viewModel: HomeViewModel = viewModel()
 ) {
-    val snapRepository = remember { SnapRepository() }
-    val coroutineScope = rememberCoroutineScope()
-    val auth = remember { FirebaseAuth.getInstance() }
-    val firestore = remember { Firebase.firestore }
+    val snackbarHostState = remember { SnackbarHostState() }
     
-    var snaps by remember { mutableStateOf<List<Snap>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var username by remember { mutableStateOf<String?>(null) }
+    // Filter state
+    var selectedFilter by remember { mutableStateOf("All") }
+    val filterOptions = listOf("All", "Active", "Upcoming", "Public", "Private")
     
-    // Load user data
+    // Load data
     LaunchedEffect(Unit) {
-        auth.currentUser?.let { user ->
-            try {
-                val userDoc = firestore.collection("users").document(user.uid).get().await()
-                if (userDoc.exists()) {
-                    username = userDoc.getString("username")
-                }
-            } catch (e: Exception) {
-                // Ignore error, username will stay null
-            }
+        viewModel.loadNearbyCircles()
+    }
+    
+    // Error handling
+    LaunchedEffect(viewModel.errorMessage) {
+        viewModel.errorMessage?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
         }
     }
     
-    // Load snaps on first composition
-    LaunchedEffect(Unit) {
-        loadSnaps(snapRepository) { result ->
-            isLoading = false
-            result.fold(
-                onSuccess = { snapsList -> snaps = snapsList },
-                onFailure = { e -> error = e.message }
-            )
-        }
+    // Filter change handler
+    LaunchedEffect(selectedFilter) {
+        viewModel.setFilter(selectedFilter)
+    }
+    
+    // Function to handle circle selection
+    val onOpenCircleDetail = { circleId: String ->
+        // Navigate to circle detail screen
+        onOpenSnapViewer(circleId) // For now, reuse the snap viewer navigation
     }
     
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { 
-                    Text(
-                        "SnapConnect",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
+            TopAppBar(
+                title = { Text("SnapCircle") },
                 actions = {
-                    IconButton(onClick = {
-                        coroutineScope.launch {
-                            isLoading = true
-                            loadSnaps(snapRepository) { result ->
-                                isLoading = false
-                                result.fold(
-                                    onSuccess = { snapsList -> snaps = snapsList },
-                                    onFailure = { e -> error = e.message }
-                                )
-                            }
-                        }
-                    }) {
+                    IconButton(onClick = { viewModel.loadNearbyCircles() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
-                    
-                    // Profile button
-                    IconButton(onClick = { onOpenProfile() }) {
-                        Box {
-                            Icon(Icons.Default.AccountCircle, contentDescription = "Profile")
-                            // Show a small dot indicator if username is available
-                            if (username != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .align(Alignment.TopEnd)
-                                        .offset(x = (-2).dp, y = 2.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                            }
-                        }
+                    IconButton(onClick = onOpenProfile) {
+                        Icon(Icons.Default.Person, contentDescription = "Profile")
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onOpenCamera,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Camera, contentDescription = "Take Snap")
-            }
         },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
                     selected = true,
                     onClick = { /* Already on home */ },
-                    icon = { Icon(Icons.Outlined.Camera, contentDescription = "Snaps") },
-                    label = { Text("Snaps") }
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                    label = { Text("Home") }
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { onOpenFriends() },
-                    icon = { Icon(Icons.Outlined.Person, contentDescription = "Friends") },
-                    label = { Text("Friends") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { onOpenCircles() },
-                    icon = { Icon(Icons.Outlined.Groups, contentDescription = "Circles") },
+                    onClick = onOpenCircles,
+                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
                     label = { Text("Circles") }
                 )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenCamera,
+                    icon = { Icon(Icons.Default.AddCircle, contentDescription = "Create") },
+                    label = { Text("Create") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenFriends,
+                    icon = { Icon(Icons.Default.People, contentDescription = "Friends") },
+                    label = { Text("Friends") }
+                )
             }
-        }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onCreateCircle,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Create Circle")
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary
+            // Map header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Nearby Circles",
+                    style = MaterialTheme.typography.titleMedium
                 )
-            } else if (error != null) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        "Error: $error",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error
+                
+                TextButton(onClick = onOpenMap) {
+                    Text("View Full Map")
+                    Icon(
+                        Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            error = null
-                            coroutineScope.launch {
-                                isLoading = true
-                                loadSnaps(snapRepository) { result ->
-                                    isLoading = false
-                                    result.fold(
-                                        onSuccess = { snapsList -> snaps = snapsList },
-                                        onFailure = { e -> error = e.message }
-                                    )
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                }
+            }
+            
+            // Map preview
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (viewModel.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center)
                         )
+                    } else {
+                        MapComponent(
+                            circles = viewModel.circles,
+                            userLat = viewModel.userLat,
+                            userLng = viewModel.userLng,
+                            onCircleClick = { /* Handle in full map view */ },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    
+                    // Map overlay
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp)
                     ) {
-                        Text("Retry")
+                        Text(
+                            text = "${viewModel.circles.size} Circles nearby",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        if (viewModel.collegeTown != null) {
+                            Text(
+                                text = "College Town: ${viewModel.collegeTown}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
-            } else if (snaps.isEmpty()) {
-                Column(
+            }
+            
+            // Filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                filterOptions.forEach { filter ->
+                    FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        label = { Text(filter) },
+                        leadingIcon = if (selectedFilter == filter) {
+                            { Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp)) }
+                        } else null
+                    )
+                }
+            }
+            
+            // Circle list
+            Text(
+                text = "Recent Circles",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            
+            if (viewModel.circles.isEmpty()) {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Empty state illustration
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.tertiaryContainer
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Camera,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        "No snaps yet",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Text(
-                        "Take your first snap or connect with friends to start sharing moments",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Button(
-                        onClick = onOpenCamera,
-                        modifier = Modifier.fillMaxWidth(0.7f)
-                    ) {
-                        Icon(
-                            Icons.Default.Camera,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Take a Snap")
-                    }
-                    
-                    FilledTonalButton(
-                        onClick = onOpenFriends,
-                        modifier = Modifier.fillMaxWidth(0.7f)
-                    ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Add Friends")
-                    }
-                    
-                    OutlinedButton(
-                        onClick = onOpenCircles,
-                        modifier = Modifier.fillMaxWidth(0.7f)
-                    ) {
-                        Icon(
-                            Icons.Default.Groups,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Explore Circles")
+                    if (viewModel.isLoading) {
+                        CircularProgressIndicator()
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "No circles found nearby",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = onCreateCircle) {
+                                Text("Create a Circle")
+                            }
+                        }
                     }
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "My Circles",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Text(
-                                        text = "View and manage your circles",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                    )
-                                }
-                                FilledTonalButton(
-                                    onClick = onOpenCircles,
-                                    colors = ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                    )
-                                ) {
-                                    Text("View")
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Recent Snaps",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    
-                    items(snaps) { snap ->
-                        SnapItem(
-                            snap = snap,
-                            onClick = { onOpenSnapViewer(snap.id) }
+                    items(viewModel.circles) { circle ->
+                        CircleListItem(
+                            circle = circle,
+                            onClick = { onOpenCircleDetail(circle.id) }
                         )
                     }
                 }
@@ -362,102 +285,82 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SnapItem(
-    snap: Snap,
+fun CircleListItem(
+    circle: Circle,
     onClick: () -> Unit
 ) {
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = if (circle.isPrivate) 
+                MaterialTheme.colorScheme.secondaryContainer 
+            else 
+                MaterialTheme.colorScheme.primaryContainer
+        )
     ) {
         Row(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar placeholder
+            // Circle icon
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary
-                            )
-                        )
+                        if (circle.isPrivate) 
+                            MaterialTheme.colorScheme.secondary 
+                        else 
+                            MaterialTheme.colorScheme.primary
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = snap.senderName?.firstOrNull()?.toString() ?: "?",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    text = circle.name.first().toString(),
+                    color = if (circle.isPrivate) 
+                        MaterialTheme.colorScheme.onSecondary 
+                    else 
+                        MaterialTheme.colorScheme.onPrimary
                 )
             }
             
             Spacer(modifier = Modifier.width(16.dp))
             
+            // Circle info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = snap.senderName ?: "Unknown",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = circle.name,
+                    style = MaterialTheme.typography.titleMedium
                 )
                 
                 Text(
-                    text = formatTimestamp(snap.createdAt),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "${circle.members.size} members" + 
+                        if (circle.locationEnabled && circle.locationRadius != null) 
+                            " • ${circle.locationRadius.toInt()}m radius" 
+                        else "",
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
             
-            if (!snap.isViewed) {
-                // Use Box instead of Badge to avoid experimental API
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+            // Privacy indicator
+            if (circle.isPrivate) {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = "Private",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            } else {
+                Icon(
+                    Icons.Default.Public,
+                    contentDescription = "Public",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
     }
-}
-
-private fun formatTimestamp(timestamp: Timestamp): String {
-    val date = timestamp.toDate()
-    val now = Date()
-    
-    // If today, show time only
-    return if (isSameDay(date, now)) {
-        SimpleDateFormat("h:mm a", Locale.getDefault()).format(date)
-    } else {
-        SimpleDateFormat("MMM d", Locale.getDefault()).format(date)
-    }
-}
-
-private fun isSameDay(date1: Date, date2: Date): Boolean {
-    val cal1 = Calendar.getInstance().apply { time = date1 }
-    val cal2 = Calendar.getInstance().apply { time = date2 }
-    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-}
-
-private suspend fun loadSnaps(
-    repository: SnapRepository,
-    callback: (Result<List<Snap>>) -> Unit
-) {
-    val result = repository.getSnapsForUser()
-    callback(result)
 } 

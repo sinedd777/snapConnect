@@ -15,7 +15,8 @@ private const val TAG = "AuthScreen"
 /** Composable authentication entry-point. */
 @Composable
 fun AuthScreen(
-    onAuthSuccess: () -> Unit = {}          // called after a successful login
+    onAuthSuccess: () -> Unit = {},          // called after a successful login
+    onNavigateToCollegeTownSelection: () -> Unit = {}  // called to navigate to college town selection
 ) {
     val context = LocalContext.current
     val auth    = remember { FirebaseAuth.getInstance() }
@@ -33,7 +34,16 @@ fun AuthScreen(
                         auth.signInWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->
                                 if (task.isSuccessful) {
-                                    ensureProfileExists(auth) { onAuthSuccess() }
+                                    ensureProfileExists(auth) { 
+                                        // Check if user has a college town set
+                                        checkCollegeTownExists(auth) { hasCollegeTown ->
+                                            if (hasCollegeTown) {
+                                                onAuthSuccess()
+                                            } else {
+                                                onNavigateToCollegeTownSelection()
+                                            }
+                                        }
+                                    }
                                     Toast.makeText(context, "Sign-in successful", Toast.LENGTH_SHORT).show()
                                 } else {
                                     Log.e(TAG, "Sign-in failed", task.exception)
@@ -79,7 +89,8 @@ fun AuthScreen(
                                                 .addOnSuccessListener {
                                                     Log.d(TAG, "User profile created successfully")
                                                     Toast.makeText(context, "Sign-up successful", Toast.LENGTH_SHORT).show()
-                                                    mode = AuthMode.SIGN_IN
+                                                    // Navigate to college town selection after sign-up
+                                                    onNavigateToCollegeTownSelection()
                                                 }
                                                 .addOnFailureListener { e ->
                                                     Log.e(TAG, "Error creating user profile", e)
@@ -180,6 +191,28 @@ private fun ensureProfileExists(
     }.addOnFailureListener { e ->
         Log.e(TAG, "Error checking if user profile exists", e)
         onComplete()
+    }
+}
+
+/** Checks if the user has a college town set in their profile. */
+private fun checkCollegeTownExists(
+    auth: FirebaseAuth,
+    onComplete: (Boolean) -> Unit
+) {
+    val user = auth.currentUser ?: return onComplete(false)
+
+    val db = Firebase.firestore
+    val docRef = db.collection("users").document(user.uid)
+
+    docRef.get().addOnSuccessListener { snapshot ->
+        if (snapshot.exists() && snapshot.getString("collegeTown") != null) {
+            onComplete(true)
+        } else {
+            onComplete(false)
+        }
+    }.addOnFailureListener { e ->
+        Log.e(TAG, "Error checking if college town exists", e)
+        onComplete(false)
     }
 }
 

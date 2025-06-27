@@ -6,17 +6,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -28,34 +18,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -103,7 +67,7 @@ fun CreateCircleScreen(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // Permission granted, get current location
+            // Permission granted, get location
             getCurrentLocation(
                 fusedLocationClient = fusedLocationClient,
                 onLocationResult = { location ->
@@ -111,47 +75,52 @@ fun CreateCircleScreen(
                     locationLng = location.longitude
                     hasLocation = true
                     isLoadingLocation = false
-                },
-                onError = { error ->
                     scope.launch {
-                        snackbarHostState.showSnackbar("Failed to get location: $error")
+                        snackbarHostState.showSnackbar("Location acquired: ${location.latitude}, ${location.longitude}")
                     }
+                },
+                onError = { errorMessage ->
                     isLoadingLocation = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(errorMessage)
+                    }
                 }
             )
         } else {
             // Permission denied
+            isLoadingLocation = false
+            locationEnabled = false
             scope.launch {
                 snackbarHostState.showSnackbar("Location permission denied")
             }
-            isLoadingLocation = false
         }
     }
     
+    // Duration options
     val durationOptions = listOf(
-        DurationOption("1 hour", CircleRepository.DURATION_1_HOUR),
-        DurationOption("24 hours", CircleRepository.DURATION_24_HOURS),
-        DurationOption("48 hours", CircleRepository.DURATION_48_HOURS),
-        DurationOption("72 hours", CircleRepository.DURATION_72_HOURS),
-        DurationOption("7 days", CircleRepository.DURATION_7_DAYS)
+        Pair("1 hour", CircleRepository.DURATION_1_HOUR),
+        Pair("24 hours", CircleRepository.DURATION_24_HOURS),
+        Pair("48 hours", CircleRepository.DURATION_48_HOURS),
+        Pair("72 hours", CircleRepository.DURATION_72_HOURS),
+        Pair("7 days", CircleRepository.DURATION_7_DAYS)
     )
     
-    // Handle success/error
+    // Observe created circle ID
     LaunchedEffect(viewModel.createdCircleId) {
-        viewModel.createdCircleId?.let {
-            onCircleCreated(it)
+        viewModel.createdCircleId?.let { circleId ->
+            onCircleCreated(circleId)
         }
     }
     
+    // Observe error messages
     LaunchedEffect(viewModel.errorMessage) {
-        viewModel.errorMessage?.let {
-            scope.launch {
-                snackbarHostState.showSnackbar(it)
-            }
+        viewModel.errorMessage?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
         }
     }
     
-    // Location permission explanation dialog
+    // Location permission dialog
     if (showLocationPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showLocationPermissionDialog = false },
@@ -170,7 +139,10 @@ fun CreateCircleScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showLocationPermissionDialog = false }
+                    onClick = { 
+                        showLocationPermissionDialog = false
+                        locationEnabled = false
+                    }
                 ) {
                     Text("Cancel")
                 }
@@ -239,26 +211,30 @@ fun CreateCircleScreen(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                Column(Modifier.selectableGroup()) {
-                    durationOptions.forEach { option ->
+                Column(
+                    modifier = Modifier
+                        .selectableGroup()
+                        .fillMaxWidth()
+                ) {
+                    durationOptions.forEach { (label, duration) ->
                         Row(
-                            Modifier
+                            modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
                                 .selectable(
-                                    selected = (selectedDuration == option.durationMillis),
-                                    onClick = { selectedDuration = option.durationMillis },
+                                    selected = selectedDuration == duration,
+                                    onClick = { selectedDuration = duration },
                                     role = Role.RadioButton
                                 )
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = (selectedDuration == option.durationMillis),
+                                selected = selectedDuration == duration,
                                 onClick = null // null because we're handling the click on the row
                             )
                             Text(
-                                text = option.label,
+                                text = label,
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(start = 16.dp)
                             )
@@ -268,32 +244,41 @@ fun CreateCircleScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                Row(
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (isPrivate) Icons.Default.Check else Icons.Default.Public,
-                        contentDescription = null
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
-                    
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Private Circle",
-                            style = MaterialTheme.typography.titleMedium
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isPrivate) Icons.Default.Check else Icons.Default.Public,
+                            contentDescription = null
                         )
-                        Text(
-                            text = "Only invited members can join",
-                            style = MaterialTheme.typography.bodyMedium
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Private Circle",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Only invited members can join",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        
+                        Switch(
+                            checked = isPrivate,
+                            onCheckedChange = { isPrivate = it }
                         )
                     }
-                    
-                    Switch(
-                        checked = isPrivate,
-                        onCheckedChange = { isPrivate = it }
-                    )
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -302,122 +287,88 @@ fun CreateCircleScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null
+                    Text(
+                        text = "Enable Location",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
                     )
-                    
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Location-Based",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Members must be in the specified location to view content",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
                     
                     Switch(
                         checked = locationEnabled,
-                        onCheckedChange = { locationEnabled = it }
+                        onCheckedChange = { enabled ->
+                            locationEnabled = enabled
+                            
+                            if (enabled && !hasLocation) {
+                                // Check if we have permission
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.ACCESS_FINE_LOCATION
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    // We have permission, get location
+                                    isLoadingLocation = true
+                                    getCurrentLocation(
+                                        fusedLocationClient = fusedLocationClient,
+                                        onLocationResult = { location ->
+                                            locationLat = location.latitude
+                                            locationLng = location.longitude
+                                            hasLocation = true
+                                            isLoadingLocation = false
+                                        },
+                                        onError = { errorMessage ->
+                                            isLoadingLocation = false
+                                            locationEnabled = false
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(errorMessage)
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    // Need to request permission
+                                    showLocationPermissionDialog = true
+                                }
+                            }
+                        }
                     )
                 }
                 
-                // Location settings when locationEnabled is true
                 if (locationEnabled) {
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            Text(
-                                text = "Location Settings",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            
-                            if (!hasLocation) {
-                                Button(
-                                    onClick = {
-                                        when {
-                                            // Check if we already have permission
-                                            ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.ACCESS_FINE_LOCATION
-                                            ) == PackageManager.PERMISSION_GRANTED -> {
-                                                isLoadingLocation = true
-                                                getCurrentLocation(
-                                                    fusedLocationClient = fusedLocationClient,
-                                                    onLocationResult = { location ->
-                                                        locationLat = location.latitude
-                                                        locationLng = location.longitude
-                                                        hasLocation = true
-                                                        isLoadingLocation = false
-                                                    },
-                                                    onError = { error ->
-                                                        scope.launch {
-                                                            snackbarHostState.showSnackbar("Failed to get location: $error")
-                                                        }
-                                                        isLoadingLocation = false
-                                                    }
-                                                )
-                                            }
-                                            // Show rationale dialog
-                                            else -> {
-                                                showLocationPermissionDialog = true
-                                            }
-                                        }
-                                    },
+                            if (isLoadingLocation) {
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isLoadingLocation
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        if (isLoadingLocation) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(20.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Default.MyLocation,
-                                                contentDescription = null
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        }
-                                        Text(text = if (isLoadingLocation) "Getting location..." else "Use Current Location")
-                                    }
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text("Getting location...")
                                 }
-                            } else {
-                                // Show location details
+                            } else if (hasLocation) {
                                 Text(
-                                    text = "Current Location",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    text = "Location",
+                                    style = MaterialTheme.typography.titleMedium
                                 )
                                 
                                 Spacer(modifier = Modifier.height(8.dp))
                                 
                                 Text(
-                                    text = "Latitude: ${String.format("%.6f", locationLat)}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                
-                                Text(
-                                    text = "Longitude: ${String.format("%.6f", locationLng)}",
+                                    text = "Latitude: $locationLat\nLongitude: $locationLng",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 
@@ -428,21 +379,11 @@ fun CreateCircleScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
                                 Slider(
                                     value = locationRadius.toFloat(),
                                     onValueChange = { locationRadius = it.toDouble() },
-                                    valueRange = 50f..1000f,
-                                    steps = 19,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                
-                                Text(
-                                    text = "Members will only see content when they are within this radius",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center,
+                                    valueRange = 50f..500f,
+                                    steps = 9,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 
@@ -450,44 +391,49 @@ fun CreateCircleScreen(
                                 
                                 Button(
                                     onClick = {
+                                        // Request a location update
                                         isLoadingLocation = true
                                         getCurrentLocation(
                                             fusedLocationClient = fusedLocationClient,
                                             onLocationResult = { location ->
                                                 locationLat = location.latitude
                                                 locationLng = location.longitude
+                                                hasLocation = true
                                                 isLoadingLocation = false
                                             },
-                                            onError = { error ->
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar("Failed to update location: $error")
-                                                }
+                                            onError = { errorMessage ->
                                                 isLoadingLocation = false
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(errorMessage)
+                                                }
                                             }
                                         )
                                     },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isLoadingLocation
+                                    modifier = Modifier.align(Alignment.End)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        if (isLoadingLocation) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(20.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Default.MyLocation,
-                                                contentDescription = null
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        }
-                                        Text(text = if (isLoadingLocation) "Updating..." else "Update Location")
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.MyLocation,
+                                        contentDescription = "Update Location"
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Update Location")
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text(
+                                        text = "Location not available. Please enable location services.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
                             }
                         }
@@ -539,15 +485,13 @@ private fun getCurrentLocation(
                 if (location != null) {
                     onLocationResult(location)
                 } else {
-                    onError("Location is null")
+                    onError("Location not available. Please try again later.")
                 }
             }
             .addOnFailureListener { e ->
-                onError(e.message ?: "Unknown error")
+                onError("Failed to get location: ${e.message}")
             }
     } catch (e: Exception) {
-        onError(e.message ?: "Unknown error")
+        onError("Error accessing location: ${e.message}")
     }
-}
-
-data class DurationOption(val label: String, val durationMillis: Long) 
+} 

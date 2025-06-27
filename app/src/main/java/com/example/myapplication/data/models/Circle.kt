@@ -15,11 +15,16 @@ data class Circle(
     val pendingInvites: List<String> = emptyList(),
     val createdAt: Timestamp = Timestamp.now(),
     val expiresAt: Timestamp? = null,
-    val locationEnabled: Boolean = false,
+    val startTime: Timestamp? = null,
+    val locationEnabled: Boolean = true,
     val locationLat: Double? = null,
     val locationLng: Double? = null,
     val locationRadius: Double? = null,
-    val isPrivate: Boolean = true
+    val isPrivate: Boolean = true,
+    val inviteCode: String? = null,
+    val category: String? = null,
+    val arFilterId: String? = null,
+    val collegeTown: String? = null
 ) {
     companion object {
         fun fromMap(map: Map<String, Any>): Circle {
@@ -32,11 +37,16 @@ data class Circle(
                 pendingInvites = (map["pendingInvites"] as? List<String>) ?: emptyList(),
                 createdAt = map["createdAt"] as Timestamp,
                 expiresAt = map["expiresAt"] as? Timestamp,
-                locationEnabled = (map["locationEnabled"] as? Boolean) ?: false,
+                startTime = map["startTime"] as? Timestamp,
+                locationEnabled = (map["locationEnabled"] as? Boolean) ?: true,
                 locationLat = map["locationLat"] as? Double,
                 locationLng = map["locationLng"] as? Double,
                 locationRadius = map["locationRadius"] as? Double,
-                isPrivate = (map["isPrivate"] as? Boolean) ?: true
+                isPrivate = (map["isPrivate"] as? Boolean) ?: true,
+                inviteCode = map["inviteCode"] as? String,
+                category = map["category"] as? String,
+                arFilterId = map["arFilterId"] as? String,
+                collegeTown = map["collegeTown"] as? String
             )
         }
     }

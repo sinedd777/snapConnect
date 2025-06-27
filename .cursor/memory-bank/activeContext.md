@@ -1,7 +1,26 @@
 # Active Context
 
 ## Current Development Phase
-Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning from individual snap sharing to Circle-based group sharing with RAG integration. UI enhanced with Material 3 design system.
+Pivoting from individual snap sharing to map-based, college-focused Circle platform. Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning to map-based interface with college town selection and RAG integration. UI enhanced with Material 3 design system.
+
+## Product Pivot
+We are pivoting the app to focus on:
+1. Map-based Circle discovery and interaction
+2. College town-specific experiences
+3. Location-based sharing
+4. Enhanced RAG features for event discovery and content enhancement
+5. Collaborative, ephemeral sharing spaces tied to physical locations
+
+## User Flows Being Implemented
+1. Set Up Account with college town selection
+2. Discover Circles on Map (1 km radius)
+3. Create a Circle with location pinning
+4. Share Snaps in a Circle (photos, videos, text)
+5. React to Snaps with emoji or video reactions
+6. Chat in a Circle with RAG-powered suggestions
+7. Save content to Memory Vault
+8. View AI-generated Circle summaries post-expiration
+9. Receive event recommendations
 
 ## Recent Changes
 1. Implemented friend management system:
@@ -22,12 +41,10 @@ Core functionality implemented with authentication, camera, friend management, a
    - Snap document permissions
    - Friendship document rules
    - Circle document permissions
-   - Fixed permission issues with Circle-based snap queries
-   - Updated rules to allow unauthenticated username availability checks
-   - Simplified user document read rules to enable username checking
 5. Created Firestore indexes:
    - Composite index for querying snaps by recipients with ordering
    - Composite index for querying snaps by circleId with ordering
+   - Composite index for querying circles by isPrivate and createdAt
 6. Implemented basic AR filter UI:
    - Added AR dependencies
    - Created filter selection UI
@@ -45,78 +62,81 @@ Core functionality implemented with authentication, camera, friend management, a
    - Settings section
    - Logout functionality
    - Material 3 styling
-9. Fixed username availability check in authentication flow:
-   - Moved checkUsernameAvailability function outside of composable scope
-   - Fixed scope issues with Firebase references
-   - Ensured proper username validation during signup
-   - Updated Firestore security rules to allow unauthenticated username checks
-   - Simplified security rules for user document reads
-
-## Product Transition
-1. Rebranding from SnapConnect to SnapCircle
-2. Shifting from individual snap sharing to Circle-based group sharing
-3. Adding RAG integration for enhanced personalization
-4. Expanding AR filter capabilities
-5. Adding collaborative storytelling features
-6. Implementing location-based functionality
+9. Implemented map-based interface:
+   - Created MapComponent for visualizing Circles
+   - Implemented CircleMapScreen and CircleMapViewModel
+   - Added filter controls for Circle discovery
+   - Integrated location permissions handling
+   - Created MapRepository for location-based operations
+10. Added college town selection:
+    - Implemented CollegeTownSelectionScreen
+    - Created CollegeTownViewModel with location detection
+    - Added college town data to User model
+    - Integrated with onboarding flow
+11. Enhanced Circle creation:
+    - Added location selection to CreateCircleScreen
+    - Implemented radius controls for location-based Circles
+    - Added public/private options for Circle visibility
+    - Integrated with map-based discovery
 
 ## Active Focus Areas
-1. Firebase integration completion
-2. UI polish and consistency
-3. Performance optimization
-4. Error handling improvements
-5. User experience enhancements
-6. Circle data model design
-7. RAG integration planning
+1. RAG integration for content enhancement
+2. OAuth authentication implementation
+3. Video recording implementation (≤30 secs)
+4. Text post creation (≤280 chars)
+5. Collaborative story features
+6. Group chat functionality
+7. Memory Vault implementation
+8. Circle expiration and summary generation
+9. Event recommendation system
+10. OpenStreetMap integration for improved map experience
 
 ## Next Steps
-1. Complete Circle implementation:
-   - ✅ Circle data model design (completed)
-   - ✅ Circle security rules implementation (completed)
-   - ✅ Circle-based snap queries (completed)
-   - Circle creation UI
-   - Circle management
-   - Circle membership and permissions
-   - Circle content organization
-   - Circle expiration logic
-2. Complete AR filters implementation with real 3D models:
-   - Fix compatibility issues with ARCore/Sceneform library
-   - Implement proper face tracking and model placement
-   - Add real 3D models for filters
-3. Set up RAG integration:
-   - Identify data sources for retrieval
-   - Configure RAG model API integration
-   - Design RAG-enhanced features
-4. Implement collaborative story features:
-   - Chronological content display
-   - Live reactions
-   - Content contribution
-5. Set up push notifications for Circle activity
-6. Add offline support
-7. Implement video recording capability
-8. Add location-based Circle functionality
-9. Enhance profile screen:
-   - Add profile editing functionality
-   - Implement avatar upload
-   - Add user statistics
-   - Create theme preferences
-10. Apply Material 3 design to remaining screens:
-    - Authentication screens
-    - Camera screens
-    - Circle screens
-    - Friend management screens
+1. Implement OAuth authentication:
+   - Google integration
+   - Apple integration
+   - Phone number verification
+2. Enhance map interface with OpenStreetMap:
+   - Replace placeholder map with actual map tiles
+   - Implement proper geolocation
+   - Add map caching for offline use
+3. Add video recording capability:
+   - 30-second limit
+   - Compression
+   - Thumbnail generation
+4. Add text post creation:
+   - 280-character limit
+   - Background options
+   - Font customization
+5. Implement group chat:
+   - Real-time messaging
+   - RAG-powered suggestions
+   - Translation options
+6. Set up RAG integration:
+   - API provider selection
+   - Data source connections
+   - Caption suggestions
+   - Event context enhancement
+7. Create Circle summary generation:
+   - AI-generated collages
+   - Key moments selection
+   - Context enhancement
+8. Implement Memory Vault:
+   - Encrypted storage
+   - Content organization
+   - Export options
 
 ## Current Challenges
-1. Optimizing camera performance
-2. Managing media storage efficiently
-3. Implementing secure content delivery
-4. Handling offline scenarios
-5. Ensuring proper auto-destruction of content
-6. ARCore/Sceneform library compatibility issues
-7. RAG integration complexity
-8. Real-time collaborative features implementation
-9. Location-based functionality accuracy
-10. ✅ Firestore security rules for Circle-based content (resolved)
+1. Integrating map functionality
+2. Handling location permissions and accuracy
+3. Implementing OAuth providers
+4. Managing Circle discovery with geofencing
+5. Optimizing camera performance
+6. Implementing video recording
+7. Ensuring proper auto-destruction of content
+8. ARCore/Sceneform library compatibility issues
+9. RAG integration complexity
+10. Real-time collaborative features implementation
 
 ## Technical Decisions
 1. Using Jetpack Compose for UI
@@ -125,91 +145,58 @@ Core functionality implemented with authentication, camera, friend management, a
 4. Firebase Storage for media files
 5. CameraX for camera implementation
 6. Coil for image loading
-7. ARCore and Sceneform for AR filters (simplified implementation for now)
-8. WorkManager for background tasks (planned)
-9. RAG API integration (evaluating options)
-10. Location services for geofencing (planned)
+7. ARCore and Sceneform for AR filters
+8. OpenStreetMap for map implementation
+9. Geofencing for location-based Circles
+10. RAG API integration (evaluating options)
 11. Material 3 for consistent design system
-12. Dynamic color support for Android 12+ devices
+12. OAuth providers for authentication
+
+## Core Workflows
+1. Map Rendering and Circle Display:
+   - Fetch user's location via device GPS
+   - Query OpenStreetMap API for college town map (1 km radius)
+   - Retrieve active/upcoming Circles from database
+   - Calculate Circle pin sizes based on participant count
+   - Render map with pins, update every 5 seconds
+2. Circle Creation and Management:
+   - Store Circle details in database
+   - Validate location within 1 km radius using geofencing
+   - Generate unique invite code for private Circles
+   - Update Circle size on map as users join
+   - Schedule auto-deletion post-expiration
+3. Snap Processing:
+   - Validate format/size (≤30 secs video, ≤280 chars text)
+   - Apply selected AR filter
+   - Store snap temporarily, tagged to Circle
+   - Push snap to story feed for Circle members
+   - Delete snap when Circle expires
+4. RAG-Powered Suggestions:
+   - Query public APIs for trending events/topics
+   - Generate captions, hashtags, or filter suggestions
+   - Cache results for 1 hour to reduce API calls
+   - Deliver suggestions in <2 seconds
 
 ## Testing Status
 1. Basic unit tests needed for auth flow
 2. UI tests to be set up
 3. Integration tests pending
-4. Camera functionality tests needed
-5. AR functionality tests needed
-6. Circle functionality tests needed
-7. RAG integration tests needed
+4. Map functionality tests needed
+5. Location services tests needed
+6. Camera functionality tests needed
+7. AR functionality tests needed
+8. Circle functionality tests needed
+9. RAG integration tests needed
 
 ## Documentation Needs
-1. Authentication flow documentation
-2. Firebase setup guide
-3. UI component documentation
-4. Camera implementation guide
-5. AR filter implementation guide
-6. Circle data model documentation
-7. RAG integration documentation
-8. Testing strategy documentation
-9. Material 3 theme customization guide
+1. Map integration documentation
+2. OAuth setup guide
+3. College town selection implementation
+4. Circle creation with location guide
+5. RAG integration documentation
+6. UI component documentation
+7. Testing strategy documentation
+8. Material 3 theme customization guide
 
 ## Current Branch Structure
 ```
-main
-└── feature/friend-management (completed)
-    └── feature/snap-viewing (completed)
-        └── feature/security-rules (completed)
-            └── feature/firestore-indexes (completed)
-                └── feature/ar-filters (in progress)
-                    └── feature/circle-model (planned)
-                        └── feature/rag-integration (planned)
-                            └── feature/material3-enhancements (completed)
-                                └── feature/profile-screen (completed)
-```
-
-## Active Issues
-1. Media compression for efficient storage
-2. Advanced screenshot prevention
-3. Push notification setup
-4. Offline support implementation
-5. Profile management features
-6. AR model loading and face tracking
-7. Circle data model design
-8. RAG integration architecture
-9. Location services implementation
-
-## Recent Pull Requests
-1. Authentication flow implementation (merged)
-2. Camera functionality (merged)
-3. Friend management system (merged)
-4. Snap viewing with auto-destruction (merged)
-5. Firebase security rules (merged)
-6. Firestore indexes for snap queries (merged)
-7. Basic AR filters UI implementation (in progress)
-8. Material 3 enhancements (merged)
-9. Profile screen implementation (merged)
-
-## Immediate TODOs
-1. Design Circle data model
-2. Update existing Snap model to work with Circles
-3. Fix ARCore/Sceneform compatibility issues
-4. Complete AR filters implementation with real 3D models
-5. Research and select RAG API provider
-6. Design RAG integration architecture
-7. Set up push notifications for Circle activity
-8. Add offline queue for content uploads
-9. Implement video recording capability
-10. Enhance authentication screens with Material 3
-11. Add profile editing functionality
-
-## Current Dependencies
-See `build.gradle.kts` for full list:
-1. Firebase Auth, Firestore, Storage
-2. Jetpack Compose
-3. Navigation Components
-4. CameraX
-5. Accompanist Permissions
-6. Coil for image loading
-7. ARCore and Sceneform for AR
-8. Kotlin Coroutines
-9. Location services (to be added)
-10. RAG API client (to be added) 

@@ -3,16 +3,21 @@
 ## Architecture Overview
 
 ### Core Components
-1. Android App (Kotlin + Jetpack Compose)
+1. Cross-Platform Mobile App (iOS and Android)
+   - Android: Kotlin + Jetpack Compose
+   - iOS: Swift + SwiftUI (planned)
 2. Firebase Backend Services
-   - Authentication (Email/Password)
+   - Authentication (OAuth providers)
    - Firestore Database
    - Cloud Storage
    - Cloud Messaging (planned)
 3. Cloud Functions (planned)
-4. AR Components
-   - ARCore for face tracking (planned)
-   - Sceneform for 3D rendering (planned)
+4. Map Integration
+   - OpenStreetMap for map rendering
+   - Geofencing for location-based features
+5. AR Components
+   - ARCore/ARKit for face tracking
+   - 3D model rendering for filters
 
 ## Data Models
 
@@ -23,7 +28,9 @@ data class User(
     val email: String,
     val username: String? = null,
     val avatarUrl: String? = null,
-    val createdAt: Timestamp? = null
+    val createdAt: Timestamp? = null,
+    val collegeTown: String? = null,
+    val oauthProvider: String? = null
 ) {
     companion object {
         fun fromMap(map: Map<String, Any>): User {
@@ -32,36 +39,58 @@ data class User(
                 email = map["email"] as String,
                 username = map["username"] as? String,
                 avatarUrl = map["avatarUrl"] as? String,
-                createdAt = map["createdAt"] as? Timestamp
+                createdAt = map["createdAt"] as? Timestamp,
+                collegeTown = map["collegeTown"] as? String,
+                oauthProvider = map["oauthProvider"] as? String
             )
         }
     }
 }
 ```
 
-### Friendship / FriendRequest
+### Circle
 ```kotlin
-data class FriendRequest(
-    val id: String,
-    val userA: String,
-    val userB: String,
-    val status: String,
-    val createdAt: Timestamp,
-    val requesterDetails: User? = null
+data class Circle(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val description: String? = null,
+    val creatorId: String,
+    val members: List<String> = emptyList(),
+    val pendingInvites: List<String> = emptyList(),
+    val createdAt: Timestamp = Timestamp.now(),
+    val expiresAt: Timestamp? = null,
+    val startTime: Timestamp? = null,
+    val locationEnabled: Boolean = true,
+    val locationLat: Double? = null,
+    val locationLng: Double? = null,
+    val locationRadius: Double? = null,
+    val isPrivate: Boolean = true,
+    val inviteCode: String? = null,
+    val category: String? = null,
+    val arFilterId: String? = null,
+    val collegeTown: String? = null
 ) {
     companion object {
-        fun fromMap(map: Map<String, Any>): FriendRequest {
-            val requesterDetails = (map["requesterDetails"] as? Map<String, Any>)?.let {
-                User.fromMap(it)
-            }
-            
-            return FriendRequest(
+        fun fromMap(map: Map<String, Any>): Circle {
+            return Circle(
                 id = map["id"] as String,
-                userA = map["userA"] as String,
-                userB = map["userB"] as String,
-                status = map["status"] as String,
+                name = map["name"] as String,
+                description = map["description"] as? String,
+                creatorId = map["creatorId"] as String,
+                members = (map["members"] as? List<String>) ?: emptyList(),
+                pendingInvites = (map["pendingInvites"] as? List<String>) ?: emptyList(),
                 createdAt = map["createdAt"] as Timestamp,
-                requesterDetails = requesterDetails
+                expiresAt = map["expiresAt"] as? Timestamp,
+                startTime = map["startTime"] as? Timestamp,
+                locationEnabled = (map["locationEnabled"] as? Boolean) ?: true,
+                locationLat = map["locationLat"] as? Double,
+                locationLng = map["locationLng"] as? Double,
+                locationRadius = map["locationRadius"] as? Double,
+                isPrivate = (map["isPrivate"] as? Boolean) ?: true,
+                inviteCode = map["inviteCode"] as? String,
+                category = map["category"] as? String,
+                arFilterId = map["arFilterId"] as? String,
+                collegeTown = map["collegeTown"] as? String
             )
         }
     }
@@ -74,13 +103,18 @@ data class Snap(
     val id: String,
     val sender: String,
     val senderName: String? = null,
-    val recipients: List<String>,
-    val mediaUrl: String,
-    val mediaType: String,
+    val circleId: String? = null,
+    val recipients: List<String> = emptyList(),
+    val mediaUrl: String? = null,
+    val mediaType: String? = null,
+    val textContent: String? = null,
     val createdAt: Timestamp,
     val expiresAt: Timestamp? = null,
     val viewedBy: List<String> = emptyList(),
-    val screenshotBy: List<String> = emptyList()
+    val screenshotBy: List<String> = emptyList(),
+    val reactions: Map<String, String> = emptyMap(),
+    val videoReactions: Map<String, String> = emptyMap(),
+    val arFilterId: String? = null
 ) {
     val isViewed: Boolean
         get() = viewedBy.isNotEmpty()
@@ -94,13 +128,18 @@ data class Snap(
                 id = map["id"] as String,
                 sender = map["sender"] as String,
                 senderName = map["senderName"] as? String,
-                recipients = map["recipients"] as List<String>,
-                mediaUrl = map["mediaUrl"] as String,
-                mediaType = map["mediaType"] as String,
+                circleId = map["circleId"] as? String,
+                recipients = (map["recipients"] as? List<String>) ?: emptyList(),
+                mediaUrl = map["mediaUrl"] as? String,
+                mediaType = map["mediaType"] as? String,
+                textContent = map["textContent"] as? String,
                 createdAt = map["createdAt"] as Timestamp,
                 expiresAt = map["expiresAt"] as? Timestamp,
                 viewedBy = (map["viewedBy"] as? List<String>) ?: emptyList(),
-                screenshotBy = (map["screenshotBy"] as? List<String>) ?: emptyList()
+                screenshotBy = (map["screenshotBy"] as? List<String>) ?: emptyList(),
+                reactions = (map["reactions"] as? Map<String, String>) ?: emptyMap(),
+                videoReactions = (map["videoReactions"] as? Map<String, String>) ?: emptyMap(),
+                arFilterId = map["arFilterId"] as? String
             )
         }
     }
@@ -110,36 +149,129 @@ data class Snap(
 ### ARFilter
 ```kotlin
 data class ARFilter(
+    val id: String = UUID.randomUUID().toString(),
     val name: String,
-    val modelPath: String
+    val modelPath: String,
+    val thumbnailUrl: String? = null,
+    val category: String? = null,
+    val isDefault: Boolean = false
 )
 ```
 
-### Notification
+### ChatMessage
 ```kotlin
-data class Notification(
-    val id: String,
-    val userId: String,
-    val type: String,
-    val payload: Map<String, Any>,
-    val read: Boolean,
-    val createdAt: Timestamp
+data class ChatMessage(
+    val id: String = UUID.randomUUID().toString(),
+    val circleId: String,
+    val senderId: String,
+    val senderName: String? = null,
+    val content: String,
+    val createdAt: Timestamp = Timestamp.now(),
+    val reactions: Map<String, String> = emptyMap(),
+    val translatedContent: Map<String, String> = emptyMap()
 )
 ```
 
-### ModerationItem
+### CircleSummary
 ```kotlin
-data class ModerationItem(
+data class CircleSummary(
     val id: String,
-    val contentId: String,
-    val flaggerId: String,
-    val reason: String,
-    val status: String,
-    val createdAt: Timestamp
+    val circleId: String,
+    val title: String,
+    val description: String? = null,
+    val collageUrls: List<String> = emptyList(),
+    val highlightSnapIds: List<String> = emptyList(),
+    val aiGeneratedText: String? = null,
+    val createdAt: Timestamp = Timestamp.now(),
+    val eventContext: Map<String, Any> = emptyMap()
 )
 ```
 
-## Implemented Repository Patterns
+## Core Repositories
+
+### CircleRepository
+```kotlin
+class CircleRepository {
+    private val firestore: FirebaseFirestore = Firebase.firestore
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    
+    // Collection names
+    companion object {
+        private const val CIRCLES_COLLECTION = "circles"
+        private const val USERS_COLLECTION = "users"
+        
+        // Circle duration options in hours
+        val DURATION_1_HOUR = TimeUnit.HOURS.toMillis(1)
+        val DURATION_24_HOURS = TimeUnit.HOURS.toMillis(24)
+        val DURATION_48_HOURS = TimeUnit.HOURS.toMillis(48)
+        val DURATION_72_HOURS = TimeUnit.HOURS.toMillis(72)
+        val DURATION_7_DAYS = TimeUnit.DAYS.toMillis(7)
+    }
+    
+    /**
+     * Create a new Circle with location
+     */
+    suspend fun createCircle(
+        name: String,
+        description: String? = null,
+        durationMillis: Long = DURATION_24_HOURS,
+        startTimeMillis: Long? = null,
+        isPrivate: Boolean = true,
+        locationEnabled: Boolean = true,
+        locationLat: Double? = null,
+        locationLng: Double? = null,
+        locationRadius: Double? = null,
+        initialMembers: List<String> = emptyList(),
+        category: String? = null,
+        arFilterId: String? = null
+    ): Result<Circle> {
+        // Implementation details
+    }
+    
+    /**
+     * Get nearby Circles based on location and radius
+     */
+    suspend fun getNearbyCircles(
+        lat: Double,
+        lng: Double,
+        radiusKm: Double = 1.0,
+        limit: Long = 50
+    ): Result<List<Circle>> {
+        // Implementation details
+    }
+    
+    /**
+     * Get Circles for a specific college town
+     */
+    suspend fun getCollegeTownCircles(
+        collegeTown: String,
+        limit: Long = 50
+    ): Result<List<Circle>> {
+        // Implementation details
+    }
+    
+    /**
+     * Join a public Circle
+     */
+    suspend fun joinPublicCircle(circleId: String): Result<Unit> {
+        // Implementation details
+    }
+    
+    /**
+     * Join a private Circle with invite code
+     */
+    suspend fun joinPrivateCircle(circleId: String, inviteCode: String): Result<Unit> {
+        // Implementation details
+    }
+    
+    /**
+     * Generate a unique invite code for a private Circle
+     */
+    suspend fun generateInviteCode(circleId: String): Result<String> {
+        // Implementation details
+    }
+}
+```
 
 ### SnapRepository
 ```kotlin
@@ -148,204 +280,129 @@ class SnapRepository {
     private val firestore = Firebase.firestore
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 
-    suspend fun uploadSnap(localUri: Uri, recipients: List<String>? = null): Result<Uri> = try {
-        val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("No user"))
-        val snapId = UUID.randomUUID().toString()
-        val ref = storage.reference.child("snaps/$uid/$snapId.jpg")
-        ref.putFile(localUri).await()
-        val downloadUrl = ref.downloadUrl.await()
-
-        // Use provided recipients or default to just the sender
-        val finalRecipients = if (recipients.isNullOrEmpty()) {
-            listOf(uid)
-        } else {
-            // Always include the sender in recipients
-            if (recipients.contains(uid)) recipients else recipients + uid
+    /**
+     * Upload a photo snap to a Circle
+     */
+    suspend fun uploadPhotoSnap(
+        localUri: Uri,
+        circleId: String,
+        arFilterId: String? = null
+    ): Result<Snap> {
+        // Implementation details
+    }
+    
+    /**
+     * Upload a video snap to a Circle
+     */
+    suspend fun uploadVideoSnap(
+        localUri: Uri,
+        circleId: String,
+        arFilterId: String? = null
+    ): Result<Snap> {
+        // Implementation details
         }
 
-        // Store metadata
-        val data = mapOf(
-            "id" to snapId,
-            "sender" to uid,
-            "mediaUrl" to downloadUrl.toString(),
-            "mediaType" to "image/jpeg",
-            "createdAt" to com.google.firebase.Timestamp.now(),
-            "recipients" to finalRecipients,
-            "viewedBy" to listOf<String>(),
-            "screenshotBy" to listOf<String>()
-        )
-        firestore.collection("snaps").document(snapId).set(data).await()
-
-        Result.success(downloadUrl)
-    } catch (e: Exception) {
-        Result.failure(e)
+    /**
+     * Create a text snap in a Circle
+     */
+    suspend fun createTextSnap(
+        text: String,
+        circleId: String
+    ): Result<Snap> {
+        // Implementation details
     }
     
-    suspend fun getSnapsForUser(limit: Long = 20): Result<List<Snap>> = try {
-        val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("No user"))
-        
-        // Query for snaps where the current user is a recipient, ordered by creation time
-        val snapDocs = firestore.collection("snaps")
-            .whereArrayContains("recipients", uid)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(limit)
-            .get()
-            .await()
-            
-        // Process results
-        val snaps = snapDocs.documents.mapNotNull { doc ->
-            val data = doc.data ?: return@mapNotNull null
-            data["id"] = doc.id
-            Snap.fromMap(data)
-        }
-        
-        Result.success(snaps)
-    } catch (e: Exception) {
-        Result.failure(e)
+    /**
+     * Get snaps for a specific Circle
+     */
+    suspend fun getCircleSnaps(circleId: String, limit: Long = 50): Result<List<Snap>> {
+        // Implementation details
     }
     
-    suspend fun markSnapViewed(snapId: String): Result<Unit> = try {
-        // Implementation details...
-        Result.success(Unit)
-    } catch (e: Exception) {
-        Result.failure(e)
+    /**
+     * Add a reaction to a snap
+     */
+    suspend fun addReaction(snapId: String, emoji: String): Result<Unit> {
+        // Implementation details
     }
     
-    suspend fun markSnapScreenshot(snapId: String): Result<Unit> = try {
-        // Implementation details...
-        Result.success(Unit)
-    } catch (e: Exception) {
-        Result.failure(e)
+    /**
+     * Add a video reaction to a snap
+     */
+    suspend fun addVideoReaction(snapId: String, reactionUri: Uri): Result<Unit> {
+        // Implementation details
     }
     
-    suspend fun getSnapById(snapId: String): Result<Snap> {
-        // Implementation details...
+    /**
+     * Save a snap to Memory Vault
+     */
+    suspend fun saveToVault(snapId: String): Result<Unit> {
+        // Implementation details
     }
 }
 ```
 
-### FriendRepository
+### ChatRepository
 ```kotlin
-class FriendRepository {
+class ChatRepository {
     private val firestore = Firebase.firestore
     private val auth = FirebaseAuth.getInstance()
 
-    // Friend request statuses
-    companion object {
-        const val STATUS_PENDING = "pending"
-        const val STATUS_ACCEPTED = "accepted"
-        const val STATUS_REJECTED = "rejected"
-    }
-
-    suspend fun sendFriendRequest(targetUserId: String): Result<Unit> = try {
-        // Implementation details...
-        Result.success(Unit)
-    } catch (e: Exception) {
-        Result.failure(e)
+    /**
+     * Send a message in a Circle chat
+     */
+    suspend fun sendMessage(circleId: String, content: String): Result<ChatMessage> {
+        // Implementation details
     }
     
-    suspend fun acceptFriendRequest(requestId: String): Result<Unit> {
-        // Implementation details...
+    /**
+     * Get messages for a Circle chat
+     */
+    suspend fun getMessages(circleId: String, limit: Long = 50): Result<List<ChatMessage>> {
+        // Implementation details
     }
     
-    suspend fun rejectFriendRequest(requestId: String): Result<Unit> {
-        // Implementation details...
+    /**
+     * Translate a message to a different language
+     */
+    suspend fun translateMessage(messageId: String, targetLanguage: String): Result<String> {
+        // Implementation details
     }
     
-    suspend fun getFriends(): Result<List<User>> = try {
-        // Implementation details...
-        Result.success(friends)
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-    
-    suspend fun getPendingFriendRequests(): Result<List<FriendRequest>> = try {
-        // Implementation details...
-        Result.success(pendingRequests)
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-    
-    suspend fun searchUsers(query: String): Result<List<User>> = try {
-        // Implementation details...
-        Result.success(users)
-    } catch (e: Exception) {
-        Result.failure(e)
+    /**
+     * Get RAG-powered reply suggestions
+     */
+    suspend fun getSuggestedReplies(circleId: String, messageContext: List<String>): Result<List<String>> {
+        // Implementation details
     }
 }
 ```
 
-### ARFilterManager (Simplified)
+### MapRepository
 ```kotlin
-class ARFilterManager(
-    private val context: Context,
-    private val arSceneView: ArSceneView,
-    private val coroutineScope: CoroutineScope
-) : DefaultLifecycleObserver {
+class MapRepository {
+    private val firestore = Firebase.firestore
+    private val auth = FirebaseAuth.getInstance()
     
-    // Currently active filter
-    private var currentFilter: ARFilter? = null
-    
-    // Available filters
-    private val availableFilters = listOf(
-        ARFilter("Sunglasses", "models/sunglasses.glb"),
-        ARFilter("Party Hat", "models/party_hat.glb"),
-        ARFilter("Bunny Ears", "models/bunny_ears.glb"),
-        ARFilter("Face Mask", "models/face_mask.glb")
-    )
-    
-    init {
-        // Configure AR scene
-        arSceneView.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
-        arSceneView.depthEnabled = true
-        arSceneView.instantPlacementEnabled = true
+    /**
+     * Get college towns list
+     */
+    suspend fun getCollegeTowns(): Result<List<String>> {
+        // Implementation details
     }
     
-    fun getAvailableFilters(): List<ARFilter> = availableFilters
-    
-    fun applyFilter(filter: ARFilter) {
-        // Remove any existing filter
-        removeCurrentFilter()
-        
-        // Store the current filter
-        currentFilter = filter
-        
-        // In a real implementation, this would load and apply a 3D model
-        println("Applying filter: ${filter.name}")
+    /**
+     * Verify if location is within a college town
+     */
+    suspend fun verifyCollegeTownLocation(lat: Double, lng: Double): Result<String?> {
+        // Implementation details
     }
     
-    fun removeCurrentFilter() {
-        if (currentFilter != null) {
-            println("Removing filter: ${currentFilter?.name}")
-            currentFilter = null
-        }
-    }
-    
-    suspend fun takeScreenshot(): Uri? = withContext(Dispatchers.IO) {
-        try {
-            // Create a temporary file for the screenshot
-            val file = File(context.cacheDir, "ar_screenshot_${System.currentTimeMillis()}.jpg")
-            
-            // In a real implementation, this would capture the AR view
-            // For now, we'll just create a simple bitmap
-            val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
-            
-            // Save the bitmap to the file
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }
-            
-            // Return the URI of the saved file
-            Uri.fromFile(file)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-    
-    override fun onDestroy(owner: LifecycleOwner) {
-        removeCurrentFilter()
-        super.onDestroy(owner)
+    /**
+     * Get map data for a specific college town
+     */
+    suspend fun getCollegeTownMapData(collegeTown: String): Result<Map<String, Any>> {
+        // Implementation details
     }
 }
 ```
@@ -353,258 +410,77 @@ class ARFilterManager(
 ## Navigation Structure
 ```
 AppNavGraph
-├── AuthScreen
+├── AuthFlow
 │   ├── SignInScreen
-│   └── SignUpScreen
-├── HomeScreen
-├── CameraScreen
-│   └── RecipientSelectorScreen
-├── SnapViewerScreen
-└── FriendsScreen
+│   ├── SignUpScreen
+│   └── CollegeTownSelectionScreen
+├── MainFlow
+│   ├── MapScreen
+│   ├── CirclesScreen
+│   ├── CameraScreen
+│   │   └── RecipientSelectorScreen
+│   ├── ProfileScreen
+│   └── NotificationsScreen
+├── CircleFlow
+│   ├── CircleDetailScreen
+│   ├── CircleStoryScreen
+│   └── CircleChatScreen
+└── CreationFlow
+    ├── CreateCircleScreen
+    ├── CircleLocationScreen
+    └── CircleInviteScreen
 ```
 
-## UI Components
+## Core Workflows
 
-### Authentication Components
-1. `AuthScreen` - Container for authentication flow
-2. `SignInScreen` - Email/password login
-3. `SignUpScreen` - New user registration
+### Map Rendering and Circle Display
+1. Fetch user's location via device GPS
+2. Query OpenStreetMap API for college town map (1 km radius)
+3. Retrieve active/upcoming Circles from database, filter by location and user preferences
+4. Calculate Circle pin sizes based on participant count (e.g., 10px base + 2px per 5 users)
+5. Render map with pins, update every 5 seconds for real-time changes
 
-### Camera Components
-1. `CameraScreen` - Camera preview and capture
-   - CameraX integration
-   - Permission handling
-   - Photo capture
-   - Upload functionality
-   - AR mode toggle
-   - AR filter selection
-2. `RecipientSelectorScreen` - Friend selection for sharing
+### Circle Creation and Management
+1. Store Circle details (title, description, location, duration, privacy) in database
+2. Validate location within 1 km radius using geofencing
+3. Generate unique invite code for private Circles
+4. Update Circle size on map as users join (recalculate every minute)
+5. Schedule auto-deletion of Circle data post-expiration
 
-### AR Components
-1. `ARFilterManager` - Manages AR filter functionality (simplified)
-   - Filter selection
-   - Filter removal
-   - Screenshot capture
-2. `FilterSelector` - UI for selecting AR filters
-   - Filter list display
-   - Filter selection
-   - Filter preview
+### Snap Processing
+1. Receive uploaded snap (photo, video, text) and validate format/size (≤30 secs, ≤280 chars)
+2. Apply selected AR filter using ARKit/ARCore
+3. Store snap temporarily in database, tagged to Circle
+4. Push snap to story feed for all Circle members
+5. Delete snap when Circle expires
 
-### Home Components
-1. `HomeScreen` - Main screen after authentication
-   - Snap list display
-   - Navigation to other screens
-   - Refresh functionality
+### RAG-Powered Suggestions
+1. Query public APIs (X, Eventbrite, news feeds) for trending events/topics in user's location
+2. Use RAG model to generate captions, hashtags, or filter suggestions
+3. Cache results for 1 hour to reduce API calls
+4. Deliver suggestions to app in <2 seconds
 
-### Snap Viewing Components
-1. `SnapViewerScreen` - Viewing received snaps
-   - Auto-destruction countdown
-   - Image display with Coil
-   - Screenshot detection
+### Reaction Handling
+1. Receive emoji or video reaction (≤5 secs) and validate format
+2. Store reaction in database, linked to snap
+3. Broadcast reaction to all Circle members in real-time via WebSocket
+4. Delete reactions with snap on Circle expiration
 
-### Friend Management Components
-1. `FriendsScreen` - Friend management interface
-   - Friend list display
-   - Friend request handling
-   - User search functionality
+### Chat Management
+1. Store chat messages (text, emojis, GIFs) in encrypted database, linked to Circle
+2. Apply RAG-powered translations if requested (using public translation API)
+3. Push messages to Circle members via real-time notifications
+4. Delete chat history when Circle expires
 
-## Security Patterns
+### Memory Vault Storage
+1. Receive user's save request for snap
+2. Encrypt snap (AES-256) and store in user's vault (local device or cloud)
+3. Provide export option as ZIP file
+4. Ensure vault access requires user authentication
 
-### Firebase Security Rules
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{db}/documents {
-    // Helper functions for circle membership and queries
-    function hasCircleIdFilter() {
-      return request.query.filters.size() >= 1 && 
-             request.query.filters[0].fieldPath == "circleId";
-    }
-    
-    function getCircleIdFromQuery() {
-      return request.query.filters[0].value;
-    }
-    
-    function isCircleMember(circleId) {
-      let circlePath = /databases/$(db)/documents/circles/$(circleId);
-      return exists(circlePath) && 
-             (request.auth.uid in get(circlePath).data.members || 
-              get(circlePath).data.creatorId == request.auth.uid);
-    }
-    
-    // User docs
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-    }
-    
-    // Snap docs
-    match /snaps/{snapId} {
-      // Allow read if the user is the sender or a recipient
-      allow read: if request.auth != null && 
-                   (resource.data.sender == request.auth.uid || 
-                    request.auth.uid in resource.data.recipients);
-      
-      // Allow creation if the user is the sender
-      allow create: if request.auth != null && 
-                     request.resource.data.sender == request.auth.uid;
-      
-      // Allow updates if the user is the sender or a recipient
-      allow update: if request.auth != null && 
-                     (resource.data.sender == request.auth.uid || 
-                      request.auth.uid in resource.data.recipients);
-      
-      // Allow reading individual snaps by circleId if the user is a member of the circle
-      allow get: if request.auth != null && 
-                   resource.data.circleId != null &&
-                   exists(/databases/$(db)/documents/circles/$(resource.data.circleId)) &&
-                   (request.auth.uid in get(/databases/$(db)/documents/circles/$(resource.data.circleId)).data.members ||
-                    get(/databases/$(db)/documents/circles/$(resource.data.circleId)).data.creatorId == request.auth.uid);
-                    
-      // Allow any authenticated user to list snaps
-      allow list: if request.auth != null;
-    }
-    
-    // Friendship docs
-    match /friendships/{friendshipId} {
-      allow read, write: if request.auth != null && 
-                          (request.auth.uid == resource.data.userA || 
-                           request.auth.uid == resource.data.userB);
-      allow create: if request.auth != null && 
-                     request.resource.data.userA == request.auth.uid;
-    }
-    
-    // Circle docs
-    match /circles/{circleId} {
-      // Allow read if user is a member or has a pending invitation
-      allow read: if request.auth != null && (
-                   (resource != null && resource.data != null && 
-                    (request.auth.uid in resource.data.members || 
-                     (resource.data.pendingInvites != null && request.auth.uid in resource.data.pendingInvites)))
-                   ||
-                   // Allow listing all circles (for queries)
-                   request.path.size() == 2
-                  );
-      
-      // Allow creation if the creator is the current user
-      allow create: if request.auth != null && 
-                     request.resource.data.creatorId == request.auth.uid;
-      
-      // Allow updates if the user is the creator or is accepting/declining an invitation
-      allow update: if request.auth != null && (
-                     // Creator can update most fields
-                     resource.data.creatorId == request.auth.uid ||
-                     
-                     // Members can only update specific fields related to their membership
-                     (request.auth.uid in resource.data.members && 
-                      onlyUpdatingMemberFields()) ||
-                     
-                     // Invited users can accept/decline invitations
-                     (resource.data.pendingInvites != null && 
-                      request.auth.uid in resource.data.pendingInvites && 
-                      onlyAcceptingOrDecliningInvitation())
-                   );
-      
-      // Allow deletion only by the creator
-      allow delete: if request.auth != null && 
-                     resource.data.creatorId == request.auth.uid;
-      
-      // Helper function to check if only member-related fields are being updated
-      function onlyUpdatingMemberFields() {
-        let allowedFields = ['members'];
-        let changedFields = request.resource.data.diff(resource.data).affectedKeys();
-        return changedFields.hasOnly(allowedFields);
-      }
-      
-      // Helper function to check if only accepting/declining invitation
-      function onlyAcceptingOrDecliningInvitation() {
-        let allowedFields = ['members', 'pendingInvites'];
-        let changedFields = request.resource.data.diff(resource.data).affectedKeys();
-        return changedFields.hasOnly(allowedFields) && 
-               (request.resource.data.pendingInvites == null || 
-                !request.resource.data.pendingInvites.hasAll([request.auth.uid]));
-      }
-    }
-  }
-}
-```
-
-### Firestore Indexes
-```json
-{
-  "indexes": [
-    {
-      "collectionGroup": "snaps",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "recipients",
-          "arrayConfig": "CONTAINS"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "snaps",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "circleId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "snaps",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "circleId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ]
-    }
-  ],
-  "fieldOverrides": []
-}
-```
-
-## Background Tasks (Planned)
-
-### WorkManager Jobs
-1. Offline snap upload queue
-2. Media compression
-3. Token refresh
-4. Contact sync
-
-### Cloud Functions (Planned)
-1. Snap expiration
-2. Push notification dispatch
-3. Media cleanup
-4. Moderation actions
-
-## Error Handling
-1. Toast messages for user feedback
-2. Result pattern for repository operations
-3. Exception handling in suspend functions
-4. Graceful degradation for network issues
-5. Robust null handling in data processing 
+### Summary Generation
+1. On Circle expiration, query database for snaps and metadata
+2. Use RAG to fetch public event context (e.g., X trends, Eventbrite data)
+3. Generate summary (collage, key snaps, text) using AI model
+4. Deliver summary to Circle members within 5 minutes
+5. Store summary temporarily (7 days) unless saved to vault 
