@@ -32,72 +32,116 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenCircles: () -> Unit,
+    onOpenCamera: () -> Unit
 ) {
-    val friendRepository = remember { FriendRepository() }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Friends", "Requests", "Search")
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
     
-    var friends by remember { mutableStateOf<List<User>>(emptyList()) }
-    var pendingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
-    var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
+    // State
     var searchQuery by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(true) }
+    var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
-    var activeTab by remember { mutableStateOf(0) }
-    var error by remember { mutableStateOf<String?>(null) }
     var searchError by remember { mutableStateOf<String?>(null) }
-    var showSearchResults by remember { mutableStateOf(false) }
-    var friendRequestSuccess by remember { mutableStateOf<String?>(null) }
     
-    // Load friends and requests on first composition
+    // Friends state
+    var friends by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isLoadingFriends by remember { mutableStateOf(true) }
+    var friendsError by remember { mutableStateOf<String?>(null) }
+    
+    // Friend requests state
+    var friendRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
+    var isLoadingRequests by remember { mutableStateOf(true) }
+    var requestsError by remember { mutableStateOf<String?>(null) }
+    
+    val friendRepository = remember { FriendRepository() }
+    
+    // Load friends and requests
     LaunchedEffect(Unit) {
-        loadFriendsAndRequests(friendRepository) { friendsResult, requestsResult ->
-            isLoading = false
-            friendsResult.fold(
-                onSuccess = { friendsList -> friends = friendsList },
-                onFailure = { e -> error = e.message }
-            )
-            requestsResult.fold(
-                onSuccess = { requestsList -> pendingRequests = requestsList },
-                onFailure = { e -> error = e.message }
-            )
+        // Load friends
+        val friendsResult = friendRepository.getFriends()
+        isLoadingFriends = false
+        friendsResult.fold(
+            onSuccess = { friendsList -> friends = friendsList },
+            onFailure = { e -> friendsError = e.message }
+        )
+        
+        // Load friend requests
+        val requestsResult = friendRepository.getPendingFriendRequests()
+        isLoadingRequests = false
+        requestsResult.fold(
+            onSuccess = { requestsList -> friendRequests = requestsList },
+            onFailure = { e -> requestsError = e.message }
+        )
+    }
+    
+    // Search handler
+    val handleSearch = {
+        if (searchQuery.isNotEmpty()) {
+            isSearching = true
+            searchError = null
+            focusManager.clearFocus()
+            
+            coroutineScope.launch {
+                val result = friendRepository.searchUsers(searchQuery)
+                isSearching = false
+                result.fold(
+                    onSuccess = { users -> searchResults = users },
+                    onFailure = { e -> searchError = e.message }
+                )
+            }
         }
     }
     
-    // Auto-hide success message after 3 seconds
-    LaunchedEffect(friendRequestSuccess) {
-        if (friendRequestSuccess != null) {
-            delay(3000)
-            friendRequestSuccess = null
-        }
-    }
-    
-    // Function to perform search
-    fun performSearch() {
-        if (searchQuery.length < 2) {
-            searchError = "Please enter at least 2 characters"
-            return
-        }
-        
-        focusManager.clearFocus()
-        isSearching = true
-        searchError = null
-        showSearchResults = true
-        
+    // Friend request handlers
+    val handleAcceptRequest = { request: FriendRequest ->
         coroutineScope.launch {
-            val result = friendRepository.searchUsers(searchQuery)
-            isSearching = false
+            val result = friendRepository.acceptFriendRequest(request.id)
             result.fold(
-                onSuccess = { users -> 
-                    searchResults = users
-                    if (users.isEmpty()) {
-                        searchError = "No users found matching '$searchQuery'"
-                    }
+                onSuccess = {
+                    // Remove from requests and add to friends
+                    friendRequests = friendRequests.filter { it.id != request.id }
+                    friends = friends + request.requesterDetails!!
+                    snackbarHostState.showSnackbar("Friend request accepted")
                 },
-                onFailure = { e -> 
-                    searchError = "Search failed: ${e.message}"
-                    searchResults = emptyList()
+                onFailure = { e ->
+                    snackbarHostState.showSnackbar("Failed to accept request: ${e.message}")
+                }
+            )
+        }
+    }
+    
+    val handleDeclineRequest = { request: FriendRequest ->
+        coroutineScope.launch {
+            val result = friendRepository.rejectFriendRequest(request.id)
+            result.fold(
+                onSuccess = {
+                    friendRequests = friendRequests.filter { it.id != request.id }
+                    snackbarHostState.showSnackbar("Friend request declined")
+                },
+                onFailure = { e ->
+                    snackbarHostState.showSnackbar("Failed to decline request: ${e.message}")
+                }
+            )
+        }
+    }
+    
+    val handleSendRequest = { user: User ->
+        coroutineScope.launch {
+            val result = friendRepository.sendFriendRequest(user.id)
+            result.fold(
+                onSuccess = {
+                    snackbarHostState.showSnackbar("Friend request sent")
+                    // Remove from search results
+                    searchResults = searchResults.filter { it.id != user.id }
+                },
+                onFailure = { e ->
+                    snackbarHostState.showSnackbar("Failed to send request: ${e.message}")
                 }
             )
         }
@@ -106,43 +150,62 @@ fun FriendsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Friends") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
+                title = { Text("Friends") }
             )
-        }
-    ) { padding ->
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenHome,
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                    label = { Text("Home") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenCircles,
+                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
+                    label = { Text("Circles") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenCamera,
+                    icon = { Icon(Icons.Default.AddCircle, contentDescription = "Create") },
+                    label = { Text("Create") }
+                )
+                NavigationBarItem(
+                    selected = true,
+                    onClick = { /* Already on friends */ },
+                    icon = { Icon(Icons.Default.People, contentDescription = "Friends") },
+                    label = { Text("Friends") }
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(paddingValues)
         ) {
             // Search bar
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { 
-                    searchQuery = it
-                    searchError = null
-                },
+                onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                placeholder = { Text("Search by username or email") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                placeholder = { Text("Search users...") },
                 trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        Row {
-                            IconButton(onClick = { 
+                    Row {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
                                 searchQuery = ""
                                 searchError = null
-                                showSearchResults = false
                             }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
-                            IconButton(onClick = { performSearch() }) {
+                            IconButton(onClick = { handleSearch() }) {
                                 Icon(Icons.Default.Send, contentDescription = "Search")
                             }
                         }
@@ -150,140 +213,63 @@ fun FriendsScreen(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { performSearch() }),
+                keyboardActions = KeyboardActions(onSearch = { handleSearch() }),
                 isError = searchError != null,
                 supportingText = searchError?.let { { Text(it) } }
             )
             
-            // Friend request success message
-            AnimatedVisibility(visible = friendRequestSuccess != null) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = "Success",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = friendRequestSuccess ?: "",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-            }
-            
             // Show search results if any
-            if (showSearchResults) {
+            if (searchResults.isNotEmpty()) {
                 SearchResultsSection(
                     searchResults = searchResults,
                     isSearching = isSearching,
-                    onSendRequest = { userId, username ->
-                        coroutineScope.launch {
-                            val result = friendRepository.sendFriendRequest(userId)
-                            result.fold(
-                                onSuccess = { 
-                                    // Remove from search results
-                                    searchResults = searchResults.filter { it.id != userId }
-                                    friendRequestSuccess = "Friend request sent to $username"
-                                },
-                                onFailure = { e -> searchError = "Failed to send request: ${e.message}" }
-                            )
-                        }
-                    },
+                    onSendRequest = { user -> handleSendRequest(user) },
                     onBack = {
-                        showSearchResults = false
+                        searchResults = emptyList()
                         searchQuery = ""
                         searchError = null
                     }
                 )
             } else {
                 // Tabs for Friends and Requests
-                TabRow(selectedTabIndex = activeTab) {
-                    Tab(
-                        selected = activeTab == 0,
-                        onClick = { activeTab = 0 },
-                        text = { Text("Friends (${friends.size})") }
-                    )
-                    Tab(
-                        selected = activeTab == 1,
-                        onClick = { activeTab = 1 },
-                        text = { Text("Requests (${pendingRequests.size})") }
-                    )
+                TabRow(selectedTabIndex = selectedTabIndex) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = { selectedTabIndex = index },
+                            text = { Text(title) }
+                        )
+                    }
                 }
                 
-                when (activeTab) {
+                when (selectedTabIndex) {
                     0 -> FriendsTab(
                         friends = friends,
-                        isLoading = isLoading,
-                        error = error,
+                        isLoading = isLoadingFriends,
+                        error = friendsError,
                         onRefresh = {
                             coroutineScope.launch {
-                                isLoading = true
-                                error = null
-                                loadFriendsAndRequests(friendRepository) { friendsResult, requestsResult ->
-                                    isLoading = false
-                                    friendsResult.fold(
-                                        onSuccess = { friendsList -> friends = friendsList },
-                                        onFailure = { e -> error = e.message }
-                                    )
-                                    requestsResult.fold(
-                                        onSuccess = { requestsList -> pendingRequests = requestsList },
-                                        onFailure = { e -> error = e.message }
-                                    )
-                                }
+                                isLoadingFriends = true
+                                friendsError = null
+                                val result = friendRepository.getFriends()
+                                isLoadingFriends = false
+                                result.fold(
+                                    onSuccess = { friendsList -> friends = friendsList },
+                                    onFailure = { e -> friendsError = e.message }
+                                )
                             }
                         }
                     )
                     1 -> RequestsTab(
-                        requests = pendingRequests,
-                        isLoading = isLoading,
-                        error = error,
-                        onAccept = { requestId ->
-                            coroutineScope.launch {
-                                val result = friendRepository.acceptFriendRequest(requestId)
-                                result.fold(
-                                    onSuccess = {
-                                        // Refresh lists
-                                        loadFriendsAndRequests(friendRepository) { friendsResult, requestsResult ->
-                                            friendsResult.fold(
-                                                onSuccess = { friendsList -> friends = friendsList },
-                                                onFailure = { e -> error = e.message }
-                                            )
-                                            requestsResult.fold(
-                                                onSuccess = { requestsList -> pendingRequests = requestsList },
-                                                onFailure = { e -> error = e.message }
-                                            )
-                                        }
-                                        friendRequestSuccess = "Friend request accepted"
-                                    },
-                                    onFailure = { e -> error = e.message }
-                                )
-                            }
-                        },
-                        onReject = { requestId ->
-                            coroutineScope.launch {
-                                val result = friendRepository.rejectFriendRequest(requestId)
-                                result.fold(
-                                    onSuccess = {
-                                        // Remove from list
-                                        pendingRequests = pendingRequests.filter { it.id != requestId }
-                                        friendRequestSuccess = "Friend request rejected"
-                                    },
-                                    onFailure = { e -> error = e.message }
-                                )
-                            }
-                        }
+                        requests = friendRequests,
+                        isLoading = isLoadingRequests,
+                        error = requestsError,
+                        onAccept = { request -> handleAcceptRequest(request) },
+                        onReject = { request -> handleDeclineRequest(request) }
                     )
+                    2 -> {
+                        // Search tab is handled by the search bar above
+                    }
                 }
             }
         }
@@ -294,63 +280,28 @@ fun FriendsScreen(
 fun SearchResultsSection(
     searchResults: List<User>,
     isSearching: Boolean,
-    onSendRequest: (String, String?) -> Unit,
+    onSendRequest: (User) -> Unit,
     onBack: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back to friends")
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (isSearching) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
-            Text(
-                text = "Search Results",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (isSearching) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (searchResults.isEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.PersonSearch,
-                        contentDescription = "No results",
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(searchResults) { user ->
+                    UserSearchItem(
+                        user = user,
+                        onSendRequest = { onSendRequest(user) }
                     )
-                    Text(
-                        text = "No users found",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        text = "Try a different search term",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(searchResults) { user ->
-                        UserSearchItem(
-                            user = user,
-                            onSendRequest = { onSendRequest(user.id, user.username) }
-                        )
-                    }
                 }
             }
         }
@@ -362,53 +313,48 @@ fun UserSearchItem(
     user: User,
     onSendRequest: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        // Avatar placeholder
+        Box(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
         ) {
-            // Avatar placeholder
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = user.username?.firstOrNull()?.toString() 
-                        ?: user.email?.firstOrNull()?.toString() 
-                        ?: "?",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(
+                text = user.username?.firstOrNull()?.toString() 
+                    ?: user.email?.firstOrNull()?.toString() 
+                    ?: "?",
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = user.username ?: "No username",
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.username ?: "No username",
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                Text(
-                    text = user.email ?: "No email",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            Button(onClick = onSendRequest) {
-                Text("Add")
-            }
+            Text(
+                text = user.email ?: "No email",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        Button(onClick = onSendRequest) {
+            Text("Add")
         }
     }
 }
@@ -461,47 +407,44 @@ fun FriendsTab(
 
 @Composable
 fun FriendItem(friend: User) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        // Avatar placeholder
+        Box(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
         ) {
-            // Avatar placeholder
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = friend.email?.firstOrNull()?.toString() ?: "?",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(
+                text = friend.username?.firstOrNull()?.toString() 
+                    ?: friend.email?.firstOrNull()?.toString() 
+                    ?: "?",
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = friend.username ?: "No username",
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = friend.username ?: "No username",
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                Text(
-                    text = friend.email ?: "No email",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = friend.email ?: "No email",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -511,26 +454,26 @@ fun RequestsTab(
     requests: List<FriendRequest>,
     isLoading: Boolean,
     error: String?,
-    onAccept: (String) -> Unit,
-    onReject: (String) -> Unit
+    onAccept: (FriendRequest) -> Unit,
+    onReject: (FriendRequest) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else if (error != null) {
-            Text(
-                text = "Error: $error",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(16.dp)
-            )
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Error: $error")
+            }
         } else if (requests.isEmpty()) {
-            Text(
-                text = "No pending requests",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(16.dp)
-            )
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("No pending requests")
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -540,8 +483,8 @@ fun RequestsTab(
                 items(requests) { request ->
                     RequestItem(
                         request = request,
-                        onAccept = { onAccept(request.id) },
-                        onReject = { onReject(request.id) }
+                        onAccept = { onAccept(request) },
+                        onReject = { onReject(request) }
                     )
                 }
             }
@@ -555,77 +498,66 @@ fun RequestItem(
     onAccept: () -> Unit,
     onReject: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
+        // Avatar placeholder
+        Box(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = request.requesterDetails?.username?.firstOrNull()?.toString() 
+                    ?: request.requesterDetails?.email?.firstOrNull()?.toString() 
+                    ?: "?",
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = request.requesterDetails?.username ?: "No username",
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            Text(
+                text = request.requesterDetails?.email ?: "No email",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onAccept,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
-                // Avatar placeholder
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = request.requesterDetails?.email?.firstOrNull()?.toString() ?: "?",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = request.requesterDetails?.username ?: "Unknown user",
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    
-                    Text(
-                        text = request.requesterDetails?.email ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text("Accept")
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+            Button(
+                onClick = onReject,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
             ) {
-                OutlinedButton(
-                    onClick = onReject,
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text("Reject")
-                }
-                
-                Button(onClick = onAccept) {
-                    Text("Accept")
-                }
+                Text("Reject")
             }
         }
     }
-}
-
-private suspend fun loadFriendsAndRequests(
-    repository: FriendRepository,
-    callback: (Result<List<User>>, Result<List<FriendRequest>>) -> Unit
-) {
-    val friendsResult = repository.getFriends()
-    val requestsResult = repository.getPendingFriendRequests()
-    callback(friendsResult, requestsResult)
 } 

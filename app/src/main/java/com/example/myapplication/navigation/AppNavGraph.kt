@@ -121,6 +121,17 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             FriendsScreen(
                 onBack = {
                     navController.popBackStack()
+                },
+                onOpenHome = {
+                    navController.navigate(Destinations.HOME) {
+                        popUpTo(Destinations.HOME) { inclusive = true }
+                    }
+                },
+                onOpenCircles = {
+                    navController.navigate(Destinations.CIRCLES)
+                },
+                onOpenCamera = {
+                    navController.navigate(Destinations.CAMERA)
                 }
             )
         }
@@ -170,6 +181,17 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     if (accepted) {
                         navController.navigate(Destinations.circleDetail(circleId))
                     }
+                },
+                onOpenHome = {
+                    navController.navigate(Destinations.HOME) {
+                        popUpTo(Destinations.HOME) { inclusive = true }
+                    }
+                },
+                onOpenCamera = {
+                    navController.navigate(Destinations.CAMERA)
+                },
+                onOpenFriends = {
+                    navController.navigate(Destinations.FRIENDS)
                 }
             )
         }

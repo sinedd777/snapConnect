@@ -21,6 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
@@ -29,11 +32,12 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -69,6 +73,9 @@ fun CirclesScreen(
     onCreateCircle: () -> Unit,
     onCircleSelected: (String) -> Unit,
     onInvitationAction: (String, Boolean) -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenCamera: () -> Unit,
+    onOpenFriends: () -> Unit,
     viewModel: CirclesViewModel = viewModel()
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -84,6 +91,34 @@ fun CirclesScreen(
             TopAppBar(
                 title = { Text("Circles") }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenHome,
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                    label = { Text("Home") }
+                )
+                NavigationBarItem(
+                    selected = true,
+                    onClick = { /* Already on circles */ },
+                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
+                    label = { Text("Circles") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenCamera,
+                    icon = { Icon(Icons.Default.AddCircle, contentDescription = "Create") },
+                    label = { Text("Create") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onOpenFriends,
+                    icon = { Icon(Icons.Default.People, contentDescription = "Friends") },
+                    label = { Text("Friends") }
+                )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
