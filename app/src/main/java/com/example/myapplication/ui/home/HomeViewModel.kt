@@ -28,6 +28,10 @@ class HomeViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     
+    companion object {
+        private const val TAG = "HomeViewModel"
+    }
+    
     // Map state
     var circles by mutableStateOf<List<Circle>>(emptyList())
         private set
@@ -106,27 +110,44 @@ class HomeViewModel : ViewModel() {
                 val lat = userLat ?: 37.7749
                 val lng = userLng ?: -122.4194
                 
-                if (isDebugMode) {
-                    Log.d("HomeViewModel", "Loading circles with location: $lat, $lng")
-                    Log.d("HomeViewModel", "College town: $collegeTown")
-                    Log.d("HomeViewModel", "Current filter: $currentFilter")
-                }
+                Log.d(TAG, "Loading circles for location: ($lat, $lng)")
+                Log.d(TAG, "Current filter: $currentFilter")
+                Log.d(TAG, "College town: $collegeTown")
                 
                 // If we have a college town, prioritize that for fetching circles
                 val result = if (collegeTown != null) {
+                    Log.d(TAG, "Fetching circles for college town: $collegeTown")
                     circleRepository.getCollegeTownCircles(collegeTown!!)
                 } else {
+                    Log.d(TAG, "Fetching nearby circles within 1km radius")
                     circleRepository.getNearbyCircles(lat, lng)
                 }
                 
                 if (result.isSuccess) {
-                    val allCircles = result.getOrNull() ?: emptyList()
+                    var allCircles = result.getOrNull() ?: emptyList()
+                    Log.d(TAG, "Loaded ${allCircles.size} circles before filtering")
                     
-                    if (isDebugMode) {
-                        Log.d("HomeViewModel", "Loaded ${allCircles.size} circles")
-                        allCircles.forEach { circle ->
-                            Log.d("HomeViewModel", "Circle: ${circle.name}, lat: ${circle.locationLat}, lng: ${circle.locationLng}")
+                    // If no circles found, create test circles
+                    if (allCircles.isEmpty()) {
+                        Log.d(TAG, "No circles found, creating test circles")
+                        val testResult = circleRepository.createTestCircles(lat, lng)
+                        if (testResult.isSuccess) {
+                            allCircles = testResult.getOrNull() ?: emptyList()
+                            Log.d(TAG, "Created ${allCircles.size} test circles")
+                        } else {
+                            Log.e(TAG, "Failed to create test circles: ${testResult.exceptionOrNull()?.message}")
                         }
+                    }
+                    
+                    // Log each circle's details
+                    allCircles.forEach { circle ->
+                        Log.d(TAG, """Circle details:
+                            |ID: ${circle.id}
+                            |Name: ${circle.name}
+                            |Location: (${circle.locationLat}, ${circle.locationLng})
+                            |Private: ${circle.isPrivate}
+                            |Category: ${circle.category}
+                            |Members: ${circle.members.size}""".trimMargin())
                     }
                     
                     // Apply filter
@@ -144,21 +165,15 @@ class HomeViewModel : ViewModel() {
                         else -> allCircles
                     }
                     
-                    // If no circles found and we're in debug mode, create some test circles
-                    if (circles.isEmpty() && isDebugMode) {
-                        createTestCirclesIfNeeded(lat, lng)
-                    }
+                    Log.d(TAG, "After filtering: ${circles.size} circles remain")
                 } else {
-                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to load nearby circles"
-                    if (isDebugMode) {
-                        Log.e("HomeViewModel", "Error loading circles: $errorMessage")
-                    }
+                    val error = result.exceptionOrNull()
+                    Log.e(TAG, "Failed to load circles: ${error?.message}", error)
+                    errorMessage = error?.message ?: "Failed to load nearby circles"
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Exception loading circles: ${e.message}", e)
                 errorMessage = e.message ?: "Unknown error occurred"
-                if (isDebugMode) {
-                    Log.e("HomeViewModel", "Exception loading circles: ${e.message}")
-                }
             } finally {
                 isLoading = false
             }

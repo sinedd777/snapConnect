@@ -56,6 +56,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.DurationUnit
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +70,7 @@ fun HomeScreen(
     onOpenMap: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
+    val TAG = "HomeScreen"
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -156,21 +158,49 @@ fun HomeScreen(
         }
     }
     
-    // Load data
+    // Debug: Track circles state changes
+    LaunchedEffect(viewModel.circles) {
+        Log.d(TAG, "Circles state updated: ${viewModel.circles.size} circles")
+        viewModel.circles.forEach { circle ->
+            Log.d(TAG, """Circle details:
+                |ID: ${circle.id}
+                |Name: ${circle.name}
+                |Location: (${circle.locationLat}, ${circle.locationLng})
+                |Private: ${circle.isPrivate}
+                |Category: ${circle.category}
+                |Members: ${circle.members.size}
+                |Location Enabled: ${circle.locationEnabled}""".trimMargin())
+        }
+    }
+
+    // Debug: Track location updates
+    LaunchedEffect(viewModel.userLat, viewModel.userLng) {
+        Log.d(TAG, "Location updated - Lat: ${viewModel.userLat}, Lng: ${viewModel.userLng}")
+    }
+
+    // Debug: Track loading state
+    LaunchedEffect(viewModel.isLoading) {
+        Log.d(TAG, "Loading state changed: ${viewModel.isLoading}")
+    }
+    
+    // Load data with debug logging
     LaunchedEffect(Unit) {
+        Log.d(TAG, "Initial data load triggered")
         viewModel.loadNearbyCircles()
     }
     
-    // Error handling
+    // Error handling with debug logging
     LaunchedEffect(viewModel.errorMessage) {
         viewModel.errorMessage?.let { error ->
+            Log.e(TAG, "Error occurred: $error")
             snackbarHostState.showSnackbar(error)
             viewModel.clearError()
         }
     }
     
-    // Filter change handler
+    // Filter change handler with debug logging
     LaunchedEffect(selectedFilter) {
+        Log.d(TAG, "Filter changed to: $selectedFilter")
         viewModel.setFilter(selectedFilter)
     }
     
@@ -180,13 +210,11 @@ fun HomeScreen(
         onOpenSnapViewer(circleId) // For now, reuse the snap viewer navigation
     }
     
-    // Show bottom sheet when circles are loaded and not in fullscreen mode
+    // Debug: Track bottom sheet visibility
     LaunchedEffect(viewModel.circles, isMapFullscreen) {
-        if (viewModel.circles.isNotEmpty() && !isMapFullscreen) {
-            showBottomSheet = true
-        } else {
-            showBottomSheet = false
-        }
+        val shouldShow = viewModel.circles.isNotEmpty() && !isMapFullscreen
+        Log.d(TAG, "Bottom sheet visibility update - Should show: $shouldShow, Circles: ${viewModel.circles.size}, Fullscreen: $isMapFullscreen")
+        showBottomSheet = shouldShow
     }
     
     Scaffold(
@@ -308,10 +336,18 @@ fun HomeScreen(
                             )
                         } else {
                             OSMMapComponent(
-                                circles = viewModel.circles,
+                                circles = viewModel.circles.also { 
+                                    Log.d(TAG, "Rendering map with ${it.size} circles")
+                                    it.forEach { circle ->
+                                        Log.d(TAG, "Rendering circle on map - ID: ${circle.id}, Location: (${circle.locationLat}, ${circle.locationLng})")
+                                    }
+                                },
                                 userLat = viewModel.userLat,
                                 userLng = viewModel.userLng,
-                                onCircleClick = { /* Handle in full map view */ },
+                                onCircleClick = { circle -> 
+                                    Log.d(TAG, "Circle clicked on map - ID: ${circle.id}")
+                                    onOpenCircleDetail(circle.id)
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -425,10 +461,6 @@ fun HomeScreen(
                                         text = "No circles found nearby",
                                         style = MaterialTheme.typography.bodyLarge
                                     )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Button(onClick = onCreateCircle) {
-                                        Text("Create a Circle")
-                                    }
                                 }
                             }
                         }
@@ -438,8 +470,12 @@ fun HomeScreen(
             
             // Bottom Sheet for Circles
             if (showBottomSheet && !isMapFullscreen && viewModel.circles.isNotEmpty()) {
+                Log.d(TAG, "Showing bottom sheet with ${viewModel.circles.size} circles")
                 ModalBottomSheet(
-                    onDismissRequest = { showBottomSheet = false },
+                    onDismissRequest = { 
+                        Log.d(TAG, "Bottom sheet dismissed")
+                        showBottomSheet = false 
+                    },
                     sheetState = bottomSheetState,
                     dragHandle = {
                         Column(
@@ -475,9 +511,13 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(viewModel.circles) { circle ->
+                            Log.d(TAG, "Rendering circle in bottom sheet - ID: ${circle.id}")
                             CircleBottomSheetItem(
                                 circle = circle,
-                                onClick = { onOpenCircleDetail(circle.id) }
+                                onClick = { 
+                                    Log.d(TAG, "Circle clicked in bottom sheet - ID: ${circle.id}")
+                                    onOpenCircleDetail(circle.id) 
+                                }
                             )
                         }
                     }

@@ -2,6 +2,7 @@ package com.example.myapplication.ui.map.osm
 
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.preference.PreferenceManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -22,6 +23,8 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import android.view.ScaleGestureDetector
 
+private const val TAG = "OSMMapView"
+
 /**
  * A Jetpack Compose wrapper for the OpenStreetMap MapView
  */
@@ -34,20 +37,56 @@ fun OSMMapView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     
+    Log.d(TAG, "OSMMapView composition started")
+    
     // Configure OSMDroid
     LaunchedEffect(Unit) {
-        Configuration.getInstance().load(
-            context,
-            PreferenceManager.getDefaultSharedPreferences(context)
-        )
+        try {
+            Log.d(TAG, "Initializing OSMDroid configuration")
+            Configuration.getInstance().apply {
+                load(context, PreferenceManager.getDefaultSharedPreferences(context))
+                userAgentValue = context.packageName
+                osmdroidBasePath = context.filesDir
+                osmdroidTileCache = context.cacheDir
+                Log.d(TAG, """
+                    OSMDroid base configuration:
+                    - Base path: $osmdroidBasePath
+                    - Cache path: $osmdroidTileCache
+                    - User agent: $userAgentValue
+                """.trimIndent())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to configure OSMDroid", e)
+        }
     }
     
     // Create and remember the MapView
     val mapView = remember {
-        MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            controller.setZoom(15.0)
+        try {
+            Log.d(TAG, "Creating new MapView instance")
+            MapView(context).apply {
+                Log.d(TAG, "Configuring MapView basic settings")
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                controller.setZoom(15.0)
+                setHorizontalMapRepetitionEnabled(false)
+                setVerticalMapRepetitionEnabled(false)
+                isTilesScaledToDpi = true
+                
+                // Set default center to a known location (will be updated later)
+                controller.setCenter(GeoPoint(0.0, 0.0))
+                
+                Log.d(TAG, """
+                    MapView initialized with:
+                    - Tile source: ${tileProvider?.tileSource?.name()}
+                    - Zoom level: ${zoomLevel}
+                    - Center: ${mapCenter?.latitude}, ${mapCenter?.longitude}
+                    - Tile provider: ${tileProvider?.javaClass?.simpleName}
+                """.trimIndent())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize MapView", e)
+            throw e
         }
     }
     
@@ -55,31 +94,71 @@ fun OSMMapView(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                else -> {}
+                Lifecycle.Event.ON_RESUME -> {
+                    try {
+                        Log.d(TAG, "Lifecycle ON_RESUME: Resuming MapView")
+                        Configuration.getInstance().load(context, PreferenceManager.getDefaultSharedPreferences(context))
+                        mapView.onResume()
+                        Log.d(TAG, "MapView resumed successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error resuming MapView", e)
+                    }
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    try {
+                        Log.d(TAG, "Lifecycle ON_PAUSE: Pausing MapView")
+                        mapView.onPause()
+                        Log.d(TAG, "MapView paused successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error pausing MapView", e)
+                    }
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    Log.d(TAG, "Lifecycle ON_DESTROY event received")
+                }
+                else -> {
+                    Log.d(TAG, "Lifecycle event: $event")
+                }
             }
         }
         
+        Log.d(TAG, "Adding lifecycle observer")
         lifecycleOwner.lifecycle.addObserver(observer)
         
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onDetach()
+            try {
+                Log.d(TAG, "Disposing MapView")
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                mapView.onDetach()
+                Log.d(TAG, "MapView disposed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disposing MapView", e)
+            }
         }
     }
     
     // Render the MapView
     AndroidView(
-        factory = { mapView },
+        factory = { 
+            Log.d(TAG, "AndroidView factory called for MapView")
+            mapView 
+        },
         modifier = modifier,
         update = { map ->
-            onMapReady(map)
+            try {
+                Log.d(TAG, "Executing MapView update block")
+                onMapReady(map)
+                Log.d(TAG, "MapView ready callback executed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in MapView ready callback", e)
+            }
         }
     )
     
     // Render any additional content
     content(mapView)
+    
+    Log.d(TAG, "OSMMapView composition completed")
 }
 
 /**

@@ -315,18 +315,6 @@ fun CollegeTownSelectionScreen(
                     }
                 }
             }
-            
-            // Custom town entry option
-            OutlinedButton(
-                onClick = {
-                    if (searchQuery.isNotBlank()) {
-                        selectedTown = searchQuery
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Use Custom Location")
-            }
         }
     }
 }

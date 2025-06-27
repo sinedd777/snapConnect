@@ -18,10 +18,14 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.DocumentSnapshot
 import com.firebase.geofire.GeoFireUtils
 import com.firebase.geofire.GeoLocation
+import android.util.Log
 
 class CircleRepository {
     private val firestore: FirebaseFirestore = Firebase.firestore
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    
+    // Debug tag
+    private val TAG = "CircleRepository"
     
     // Collection names
     companion object {
@@ -408,7 +412,14 @@ class CircleRepository {
         limit: Long = 50
     ): Result<List<Circle>> {
         return try {
-            val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
+            Log.d(TAG, "Getting nearby circles at ($lat, $lng) with radius ${radiusKm}km")
+            val currentUserId = auth.currentUser?.uid
+            Log.d(TAG, "Current user ID: $currentUserId")
+            
+            if (currentUserId == null) {
+                Log.e(TAG, "User not authenticated")
+                return Result.failure(IllegalStateException("User not authenticated"))
+            }
             
             // Convert radius to meters
             val radiusInM = radiusKm * 1000
@@ -417,8 +428,14 @@ class CircleRepository {
             val center = GeoLocation(lat, lng)
             val bounds = GeoFireUtils.getGeoHashQueryBounds(center, radiusInM)
             
+            Log.d(TAG, "Generated ${bounds.size} geohash query bounds")
+            bounds.forEach { bound ->
+                Log.d(TAG, "Bound: startHash=${bound.startHash}, endHash=${bound.endHash}")
+            }
+            
             // Create a list to hold all query tasks
             val tasks = bounds.map { bound ->
+                Log.d(TAG, "Creating query for bound: ${bound.startHash} to ${bound.endHash}")
                 firestore.collection(CIRCLES_COLLECTION)
                     .whereEqualTo("isPrivate", false)
                     .orderBy("geohash")
@@ -428,30 +445,74 @@ class CircleRepository {
             }
             
             // Wait for all queries to complete
+            Log.d(TAG, "Executing ${tasks.size} queries")
             val snapshots = tasks.map { it.await() }
+            
+            // Log raw results
+            snapshots.forEachIndexed { index, snapshot ->
+                Log.d(TAG, "Query $index returned ${snapshot.documents.size} documents")
+                snapshot.documents.forEach { doc ->
+                    Log.d(TAG, """Raw document:
+                        |ID: ${doc.id}
+                        |Data: ${doc.data}""".trimMargin())
+                }
+            }
             
             // Merge results and filter by actual distance
             val matchingDocs = snapshots.flatMap { snapshot ->
+                Log.d(TAG, "Processing snapshot with ${snapshot.documents.size} documents")
                 snapshot.documents.filter { doc ->
-                    val lat = doc.getDouble("locationLat") ?: return@filter false
-                    val lng = doc.getDouble("locationLng") ?: return@filter false
+                    val lat = doc.getDouble("locationLat")
+                    val lng = doc.getDouble("locationLng")
+                    
+                    if (lat == null || lng == null) {
+                        Log.w(TAG, "Document ${doc.id} has invalid location: lat=$lat, lng=$lng")
+                        return@filter false
+                    }
                     
                     // We have to filter out a few false positives due to GeoHash accuracy
                     val docLocation = GeoLocation(lat, lng)
                     val distanceInM = GeoFireUtils.getDistanceBetween(docLocation, center)
-                    distanceInM <= radiusInM
+                    val isWithinRadius = distanceInM <= radiusInM
+                    
+                    Log.d(TAG, "Circle at ($lat, $lng) is ${if (isWithinRadius) "within" else "outside"} radius (distance: ${distanceInM}m)")
+                    
+                    isWithinRadius
                 }
             }
             
+            Log.d(TAG, "Found ${matchingDocs.size} circles within radius")
+            
             // Convert to Circle objects
-            val circles = matchingDocs.map { doc ->
-                val data = doc.data ?: return@map null
-                data["id"] = doc.id
-                Circle.fromMap(data)
-            }.filterNotNull()
+            val circles = matchingDocs.mapNotNull { doc ->
+                try {
+                    val data = doc.data
+                    if (data == null) {
+                        Log.w(TAG, "Document ${doc.id} has no data")
+                        return@mapNotNull null
+                    }
+                    data["id"] = doc.id
+                    Circle.fromMap(data)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error converting document ${doc.id} to Circle: ${e.message}")
+                    null
+                }
+            }
+            
+            Log.d(TAG, "Successfully converted ${circles.size} circles")
+            circles.forEach { circle ->
+                Log.d(TAG, """Circle details:
+                    |ID: ${circle.id}
+                    |Name: ${circle.name}
+                    |Location: (${circle.locationLat}, ${circle.locationLng})
+                    |Private: ${circle.isPrivate}
+                    |Category: ${circle.category}
+                    |Members: ${circle.members.size}""".trimMargin())
+            }
             
             Result.success(circles)
         } catch (e: Exception) {
+            Log.e(TAG, "Error getting nearby circles: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -464,6 +525,7 @@ class CircleRepository {
         limit: Long = 50
     ): Result<List<Circle>> {
         return try {
+            Log.d(TAG, "Getting circles for college town: $collegeTown")
             val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
             
             val circleDocs = firestore.collection(CIRCLES_COLLECTION)
@@ -472,15 +534,76 @@ class CircleRepository {
                 .limit(limit)
                 .get()
                 .await()
-                
+            
+            Log.d(TAG, "Found ${circleDocs.documents.size} circles for college town")
+            
             val circles = circleDocs.documents.mapNotNull { doc ->
-                val data = doc.data ?: return@mapNotNull null
-                data["id"] = doc.id
-                Circle.fromMap(data)
+                try {
+                    val data = doc.data ?: return@mapNotNull null
+                    data["id"] = doc.id
+                    Circle.fromMap(data)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error converting document ${doc.id} to Circle: ${e.message}")
+                    null
+                }
             }
             
+            Log.d(TAG, "Successfully converted ${circles.size} circles")
             Result.success(circles)
         } catch (e: Exception) {
+            Log.e(TAG, "Error getting college town circles: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Create test circles near a location (for debugging)
+     */
+    suspend fun createTestCircles(lat: Double, lng: Double): Result<List<Circle>> {
+        return try {
+            Log.d(TAG, "Creating test circles near ($lat, $lng)")
+            val currentUserId = auth.currentUser?.uid
+            
+            if (currentUserId == null) {
+                Log.e(TAG, "User not authenticated")
+                return Result.failure(IllegalStateException("User not authenticated"))
+            }
+            
+            val circles = mutableListOf<Circle>()
+            
+            // Create circles at different distances and directions
+            val testData = listOf(
+                Triple("Test Circle 1", 0.0, 0.0),          // At the center
+                Triple("Test Circle 2", 0.001, 0.001),      // ~150m NE
+                Triple("Test Circle 3", -0.001, -0.001),    // ~150m SW
+                Triple("Test Circle 4", 0.002, 0.0),        // ~200m E
+                Triple("Test Circle 5", 0.0, 0.002)         // ~200m N
+            )
+            
+            testData.forEach { (name, latOffset, lngOffset) ->
+                val circleResult = createCircle(
+                    name = name,
+                    description = "A test circle for debugging",
+                    durationMillis = DURATION_24_HOURS,
+                    isPrivate = false,
+                    locationEnabled = true,
+                    locationLat = lat + latOffset,
+                    locationLng = lng + lngOffset,
+                    locationRadius = 100.0
+                )
+                
+                if (circleResult.isSuccess) {
+                    Log.d(TAG, "Successfully created test circle: $name at (${lat + latOffset}, ${lng + lngOffset})")
+                    circleResult.getOrNull()?.let { circles.add(it) }
+                } else {
+                    Log.e(TAG, "Failed to create test circle: $name - ${circleResult.exceptionOrNull()?.message}")
+                }
+            }
+            
+            Log.d(TAG, "Created ${circles.size} test circles")
+            Result.success(circles)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating test circles: ${e.message}", e)
             Result.failure(e)
         }
     }
