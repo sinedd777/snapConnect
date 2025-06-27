@@ -166,7 +166,7 @@ fun HomeScreen(
                 |ID: ${circle.id}
                 |Name: ${circle.name}
                 |Location: (${circle.locationLat}, ${circle.locationLng})
-                |Private: ${circle.isPrivate}
+                |Private: ${circle.private}
                 |Category: ${circle.category}
                 |Members: ${circle.members.size}
                 |Location Enabled: ${circle.locationEnabled}""".trimMargin())
@@ -537,7 +537,7 @@ fun CircleBottomSheetItem(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (circle.isPrivate) 
+            containerColor = if (circle.private) 
                 MaterialTheme.colorScheme.secondaryContainer 
             else 
                 MaterialTheme.colorScheme.primaryContainer
@@ -556,7 +556,7 @@ fun CircleBottomSheetItem(
                     .size(56.dp)
                     .clip(CircleShape)
                     .background(
-                        if (circle.isPrivate) 
+                        if (circle.private) 
                             MaterialTheme.colorScheme.secondary 
                         else 
                             MaterialTheme.colorScheme.primary
@@ -573,7 +573,7 @@ fun CircleBottomSheetItem(
                         else -> Icons.Default.Groups
                     },
                     contentDescription = null,
-                    tint = if (circle.isPrivate) 
+                    tint = if (circle.private) 
                         MaterialTheme.colorScheme.onSecondary 
                     else 
                         MaterialTheme.colorScheme.onPrimary,
@@ -649,19 +649,20 @@ fun CircleBottomSheetItem(
                 modifier = Modifier.height(56.dp)
             ) {
                 Icon(
-                    imageVector = if (circle.isPrivate) Icons.Default.Lock else Icons.Default.Public,
-                    contentDescription = if (circle.isPrivate) "Private" else "Public",
-                    tint = if (circle.isPrivate) 
+                    imageVector = if (circle.private) Icons.Default.Lock else Icons.Default.Public,
+                    contentDescription = if (circle.private) "Private" else "Public",
+                    tint = if (circle.private) 
                         MaterialTheme.colorScheme.onSecondaryContainer 
                     else 
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(16.dp)
                 )
                 
                 FilledTonalIconButton(
                     onClick = onClick,
                     modifier = Modifier.size(32.dp),
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (circle.isPrivate) 
+                        containerColor = if (circle.private) 
                             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f) 
                         else 
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
@@ -688,7 +689,7 @@ fun CircleListItem(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (circle.isPrivate) 
+            containerColor = if (circle.private) 
                 MaterialTheme.colorScheme.secondaryContainer 
             else 
                 MaterialTheme.colorScheme.primaryContainer
@@ -706,7 +707,7 @@ fun CircleListItem(
                     .size(40.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(
-                        if (circle.isPrivate) 
+                        if (circle.private) 
                             MaterialTheme.colorScheme.secondary 
                         else 
                             MaterialTheme.colorScheme.primary
@@ -715,7 +716,7 @@ fun CircleListItem(
             ) {
                 Text(
                     text = circle.name.first().toString(),
-                    color = if (circle.isPrivate) 
+                    color = if (circle.private) 
                         MaterialTheme.colorScheme.onSecondary 
                     else 
                         MaterialTheme.colorScheme.onPrimary
@@ -741,7 +742,7 @@ fun CircleListItem(
             }
             
             // Privacy indicator
-            if (circle.isPrivate) {
+            if (circle.private) {
                 Icon(
                     Icons.Default.Lock,
                     contentDescription = "Private",

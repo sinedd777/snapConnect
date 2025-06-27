@@ -315,8 +315,8 @@ fun CircleInfoSection(circle: Circle, memberCount: Int) {
         
         // Privacy
         Text(
-            text = if (circle.isPrivate) "Private Circle" else "Public Circle",
-            style = MaterialTheme.typography.bodySmall
+            text = if (circle.private) "Private Circle" else "Public Circle",
+            style = MaterialTheme.typography.bodyMedium
         )
         
         // Member count

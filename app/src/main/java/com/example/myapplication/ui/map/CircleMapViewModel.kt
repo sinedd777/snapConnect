@@ -121,15 +121,15 @@ class CircleMapViewModel : ViewModel() {
                             |ID: ${circle.id}
                             |Name: ${circle.name}
                             |Location: (${circle.locationLat}, ${circle.locationLng})
-                            |Private: ${circle.isPrivate}
+                            |Private: ${circle.private}
                             |Category: ${circle.category}
                             |Members: ${circle.members.size}""".trimMargin())
                     }
                     
                     // Apply filter
                     val filteredCircles = when (currentFilter) {
-                        "Public" -> allCircles.filter { !it.isPrivate }
-                        "Private" -> allCircles.filter { it.isPrivate }
+                        "Public" -> allCircles.filter { !it.private }
+                        "Private" -> allCircles.filter { it.private }
                         "Active" -> allCircles.filter { 
                             it.expiresAt != null && it.expiresAt.toDate().time > System.currentTimeMillis() 
                         }
@@ -275,7 +275,7 @@ class CircleMapViewModel : ViewModel() {
                     name = "Test Circle 1",
                     description = "A test circle for debugging",
                     durationMillis = CircleRepository.DURATION_24_HOURS,
-                    isPrivate = false,
+                    private = false,
                     locationEnabled = true,
                     locationLat = lat,
                     locationLng = lng,
@@ -293,7 +293,7 @@ class CircleMapViewModel : ViewModel() {
                     name = "Test Circle 2",
                     description = "Another test circle for debugging",
                     durationMillis = CircleRepository.DURATION_48_HOURS,
-                    isPrivate = false,
+                    private = false,
                     locationEnabled = true,
                     locationLat = lat + 0.002, // Slightly north
                     locationLng = lng + 0.002, // Slightly east

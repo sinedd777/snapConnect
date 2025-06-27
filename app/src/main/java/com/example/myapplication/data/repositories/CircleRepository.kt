@@ -47,7 +47,7 @@ class CircleRepository {
         name: String,
         description: String? = null,
         durationMillis: Long = DURATION_24_HOURS,
-        isPrivate: Boolean = true,
+        private: Boolean = true,
         locationEnabled: Boolean = false,
         locationLat: Double? = null,
         locationLng: Double? = null,
@@ -87,7 +87,7 @@ class CircleRepository {
                 locationLat = locationLat,
                 locationLng = locationLng,
                 locationRadius = locationRadius,
-                isPrivate = isPrivate,
+                private = private,
                 geohash = geohash
             )
             
@@ -277,7 +277,7 @@ class CircleRepository {
         circleId: String,
         name: String? = null,
         description: String? = null,
-        isPrivate: Boolean? = null,
+        private: Boolean? = null,
         locationEnabled: Boolean? = null,
         locationLat: Double? = null,
         locationLng: Double? = null,
@@ -301,7 +301,7 @@ class CircleRepository {
             val updates = mutableMapOf<String, Any>()
             name?.let { updates["name"] = it }
             description?.let { updates["description"] = it }
-            isPrivate?.let { updates["isPrivate"] = it }
+            private?.let { updates["private"] = it }
             locationEnabled?.let { updates["locationEnabled"] = it }
             locationLat?.let { updates["locationLat"] = it }
             locationLng?.let { updates["locationLng"] = it }
@@ -412,7 +412,8 @@ class CircleRepository {
         limit: Long = 50
     ): Result<List<Circle>> {
         return try {
-            Log.d(TAG, "Getting nearby circles at ($lat, $lng) with radius ${radiusKm}km")
+            Log.d(TAG, "========== Starting getNearbyCircles ==========")
+            Log.d(TAG, "Parameters: lat=$lat, lng=$lng, radiusKm=$radiusKm, limit=$limit")
             val currentUserId = auth.currentUser?.uid
             Log.d(TAG, "Current user ID: $currentUserId")
             
@@ -423,6 +424,7 @@ class CircleRepository {
             
             // Convert radius to meters
             val radiusInM = radiusKm * 1000
+            Log.d(TAG, "Converted radius to meters: $radiusInM")
             
             // Get the geohash query bounds
             val center = GeoLocation(lat, lng)
@@ -433,11 +435,22 @@ class CircleRepository {
                 Log.d(TAG, "Bound: startHash=${bound.startHash}, endHash=${bound.endHash}")
             }
             
+            // First, let's check how many total circles exist
+            val totalCircles = firestore.collection(CIRCLES_COLLECTION).get().await()
+            Log.d(TAG, "Total circles in database: ${totalCircles.size()}")
+            
+            // Now check how many public circles exist
+            val publicCircles = firestore.collection(CIRCLES_COLLECTION)
+                .whereEqualTo("private", false)
+                .get()
+                .await()
+            Log.d(TAG, "Total public circles in database: ${publicCircles.size()}")
+            
             // Create a list to hold all query tasks
             val tasks = bounds.map { bound ->
                 Log.d(TAG, "Creating query for bound: ${bound.startHash} to ${bound.endHash}")
                 firestore.collection(CIRCLES_COLLECTION)
-                    .whereEqualTo("isPrivate", false)
+                    .whereEqualTo("private", false)
                     .orderBy("geohash")
                     .startAt(bound.startHash)
                     .endAt(bound.endHash)
@@ -505,7 +518,7 @@ class CircleRepository {
                     |ID: ${circle.id}
                     |Name: ${circle.name}
                     |Location: (${circle.locationLat}, ${circle.locationLng})
-                    |Private: ${circle.isPrivate}
+                    |Private: ${circle.private}
                     |Category: ${circle.category}
                     |Members: ${circle.members.size}""".trimMargin())
             }
@@ -585,7 +598,7 @@ class CircleRepository {
                     name = name,
                     description = "A test circle for debugging",
                     durationMillis = DURATION_24_HOURS,
-                    isPrivate = false,
+                    private = false,
                     locationEnabled = true,
                     locationLat = lat + latOffset,
                     locationLng = lng + lngOffset,

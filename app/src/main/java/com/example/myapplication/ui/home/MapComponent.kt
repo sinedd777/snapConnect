@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -43,6 +44,15 @@ fun MapComponent(
     // Map state
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    
+    // Get colors from the theme
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
+    val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
+    val onPrimaryContainerColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val onSecondaryContainerColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     
     Box(
         modifier = modifier
@@ -108,25 +118,29 @@ fun MapComponent(
                 val centerX = size.width / 2
                 val centerY = size.height / 2
                 
-                // Draw user location as a blue dot with a pulsing circle
+                // Draw user location with a pulsing effect
+                val pulseRadius = 30f * scale
                 drawCircle(
-                    color = Color.Blue.copy(alpha = 0.2f),
-                    radius = 30f * scale,
+                    color = primaryColor.copy(alpha = 0.2f),
+                    radius = pulseRadius,
                     center = Offset(centerX + offset.x, centerY + offset.y)
                 )
                 
                 drawCircle(
-                    color = Color.Blue,
-                    radius = 10f * scale,
+                    color = primaryColor.copy(alpha = 0.4f),
+                    radius = pulseRadius * 0.7f,
+                    center = Offset(centerX + offset.x, centerY + offset.y)
+                )
+                
+                drawCircle(
+                    color = primaryColor,
+                    radius = 8f * scale,
                     center = Offset(centerX + offset.x, centerY + offset.y)
                 )
             }
             
             // Draw circles as pins on the map
-            // In a real app, these would be positioned based on GPS coordinates
             circles.forEachIndexed { index, circle ->
-                // Calculate a position for this circle
-                // This is just a placeholder - in a real app, you would convert GPS to screen coordinates
                 val pinX = size.width / 2 + (index * 50 - circles.size * 25) * scale + offset.x
                 val pinY = size.height / 2 + (index % 3 * 50 - 50) * scale + offset.y
                 
@@ -135,13 +149,28 @@ fun MapComponent(
                 val memberBonus = (circle.members.size * 0.5f).coerceAtMost(30f)
                 val pinSize = (baseSize + memberBonus) * scale
                 
-                // Draw the pin
-                val pinColor = if (circle.isPrivate) {
-                    Color(0xFFE91E63) // Pink for private
+                // Draw pin shadow
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.2f),
+                    radius = pinSize + 2f * scale,
+                    center = Offset(pinX, pinY + 2f * scale)
+                )
+                
+                // Draw the main pin circle
+                val pinColor = if (circle.private) {
+                    secondaryContainerColor
                 } else {
-                    Color(0xFF4CAF50) // Green for public
+                    primaryContainerColor
                 }
                 
+                // Draw outer glow
+                drawCircle(
+                    color = pinColor.copy(alpha = 0.3f),
+                    radius = pinSize + 4f * scale,
+                    center = Offset(pinX, pinY)
+                )
+                
+                // Draw main circle
                 drawCircle(
                     color = pinColor,
                     radius = pinSize,
@@ -150,14 +179,21 @@ fun MapComponent(
                 
                 // Draw border
                 drawCircle(
-                    color = Color.White,
+                    color = if (circle.private) 
+                        onSecondaryContainerColor.copy(alpha = 0.5f)
+                    else 
+                        onPrimaryContainerColor.copy(alpha = 0.5f),
                     radius = pinSize,
                     center = Offset(pinX, pinY),
                     style = Stroke(width = 2f * scale)
                 )
                 
-                // Store the pin position and size for click detection
-                circle.id to Pair(Offset(pinX, pinY), pinSize)
+                // Draw inner highlight
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.3f),
+                    radius = pinSize * 0.7f,
+                    center = Offset(pinX - pinSize * 0.2f, pinY - pinSize * 0.2f)
+                )
             }
         }
         
@@ -167,9 +203,14 @@ fun MapComponent(
                 text = "Your Location\n$userLat, $userLng",
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .background(
+                        surfaceColor.copy(alpha = 0.8f),
+                        MaterialTheme.shapes.small
+                    )
+                    .padding(8.dp),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = onSurfaceColor
             )
         }
         
@@ -178,19 +219,30 @@ fun MapComponent(
             text = "Zoom: ${String.format("%.1f", scale)}x",
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp),
+                .padding(16.dp)
+                .background(
+                    surfaceColor.copy(alpha = 0.8f),
+                    MaterialTheme.shapes.small
+                )
+                .padding(8.dp),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = onSurfaceColor
         )
         
         // Instructions
         if (circles.isEmpty()) {
             Text(
                 text = "Pinch to zoom\nDrag to pan",
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(
+                        surfaceColor.copy(alpha = 0.8f),
+                        MaterialTheme.shapes.medium
+                    )
+                    .padding(16.dp),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = onSurfaceColor
             )
         }
     }
@@ -211,9 +263,10 @@ fun CirclePin(
     Box(
         modifier = modifier
             .size(pinSize)
+            .shadow(4.dp, CircleShape)
             .clip(CircleShape)
             .background(
-                if (circle.isPrivate) MaterialTheme.colorScheme.secondaryContainer
+                if (circle.private) MaterialTheme.colorScheme.secondaryContainer
                 else MaterialTheme.colorScheme.primaryContainer
             ),
         contentAlignment = Alignment.Center
@@ -221,7 +274,7 @@ fun CirclePin(
         Text(
             text = circle.name.first().toString(),
             style = MaterialTheme.typography.titleMedium,
-            color = if (circle.isPrivate) MaterialTheme.colorScheme.onSecondaryContainer
+            color = if (circle.private) MaterialTheme.colorScheme.onSecondaryContainer
                   else MaterialTheme.colorScheme.onPrimaryContainer
         )
     }

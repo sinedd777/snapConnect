@@ -48,8 +48,9 @@ fun CreateCircleScreen(
     // Form state
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var isPrivate by remember { mutableStateOf(true) }
+    var private by remember { mutableStateOf(true) }
     var selectedDuration by remember { mutableLongStateOf(CircleRepository.DURATION_24_HOURS) }
+    var locationEnabled by remember { mutableStateOf(false) }
     
     // Location state - always enabled by default
     var locationLat by remember { mutableDoubleStateOf(0.0) }
@@ -311,7 +312,7 @@ fun CreateCircleScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (isPrivate) Icons.Default.Check else Icons.Default.Public,
+                            imageVector = if (private) Icons.Default.Check else Icons.Default.Public,
                             contentDescription = null
                         )
                         
@@ -329,8 +330,8 @@ fun CreateCircleScreen(
                         }
                         
                         Switch(
-                            checked = isPrivate,
-                            onCheckedChange = { isPrivate = it }
+                            checked = private,
+                            onCheckedChange = { private = it }
                         )
                     }
                 }
@@ -342,10 +343,10 @@ fun CreateCircleScreen(
                     onClick = {
                         viewModel.createCircle(
                             name = name,
-                            description = description,
+                            description = description.ifBlank { null },
                             durationMillis = selectedDuration,
-                            isPrivate = isPrivate,
-                            locationEnabled = true, // Always enabled
+                            private = private,
+                            locationEnabled = locationEnabled,
                             locationLat = if (hasLocation) locationLat else null,
                             locationLng = if (hasLocation) locationLng else null,
                             locationRadius = if (hasLocation) locationRadius else null
