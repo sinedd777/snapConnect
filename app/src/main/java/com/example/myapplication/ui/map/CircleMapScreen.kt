@@ -12,9 +12,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.data.models.Circle
-import com.example.myapplication.ui.home.MapComponent
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import com.example.myapplication.ui.map.osm.OSMMapComponent
 
 /**
  * A dedicated map screen for viewing and interacting with Circles
@@ -120,12 +120,13 @@ fun CircleMapScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 } else {
-                    MapComponent(
+                    OSMMapComponent(
                         circles = viewModel.circles,
                         userLat = viewModel.userLat,
                         userLng = viewModel.userLng,
                         onCircleClick = onCircleClick,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = viewModel
                     )
                 }
                 

@@ -26,6 +26,13 @@ service cloud.firestore {
              (resource != null && resource.data.username == username);
     }
     
+    // Helper function to check if only location fields are being updated
+    function onlyUpdatingLocationFields() {
+      let locationFields = ['lastLat', 'lastLng', 'lastLocationUpdate'];
+      let changedFields = request.resource.data.diff(resource.data).affectedKeys();
+      return changedFields.hasOnly(locationFields);
+    }
+    
     // User docs
     match /users/{userId} {
       // Allow reading user documents for authenticated users
@@ -44,8 +51,13 @@ service cloud.firestore {
       // Allow updating user documents with username validation
       allow update: if request.auth != null && 
                      request.auth.uid == userId && 
-                     (request.resource.data.username == resource.data.username || 
-                      isUsernameUnique(request.resource.data.username));
+                     (
+                       // Allow username updates with uniqueness check
+                       (request.resource.data.username == resource.data.username || 
+                        isUsernameUnique(request.resource.data.username)) ||
+                       // Allow location updates
+                       onlyUpdatingLocationFields()
+                     );
     }
     
     // Snap docs

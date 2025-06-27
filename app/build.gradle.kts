@@ -131,6 +131,16 @@ dependencies {
     implementation(libs.guava)
     implementation(libs.coil.compose)
     implementation(libs.play.services.location)
+    
+    // OpenStreetMap dependencies
+    implementation("org.osmdroid:osmdroid-android:6.1.16")
+    implementation("org.osmdroid:osmdroid-mapsforge:6.1.16")
+    implementation("org.osmdroid:osmdroid-geopackage:6.1.16") {
+        exclude(group = "com.j256.ormlite", module = "ormlite-core")
+    }
+    implementation("org.osmdroid:osmdroid-wms:6.1.16")
+    implementation("androidx.preference:preference-ktx:1.2.1")
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

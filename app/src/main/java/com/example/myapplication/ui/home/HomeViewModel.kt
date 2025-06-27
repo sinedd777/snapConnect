@@ -12,6 +12,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.location.Location
+import android.content.Context
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class HomeViewModel : ViewModel() {
     private val circleRepository = CircleRepository()
@@ -44,6 +51,13 @@ class HomeViewModel : ViewModel() {
         private set
         
     var errorMessage by mutableStateOf<String?>(null)
+        private set
+    
+    // Location state
+    var isLocationPermissionGranted by mutableStateOf(false)
+        // Make this publicly settable
+        
+    var isLocationEnabled by mutableStateOf(false)
         private set
     
     init {
@@ -125,15 +139,66 @@ class HomeViewModel : ViewModel() {
         loadNearbyCircles()
     }
     
-    // Request location update
-    fun requestLocationUpdate() {
-        // In a real app, this would request a location update from the device
-        // For now, just simulate with a slight location change
-        userLat = userLat?.plus(0.001) ?: 37.7749
-        userLng = userLng?.plus(0.001) ?: -122.4194
-        
-        // Reload circles with new location
-        loadNearbyCircles()
+    // Request location update from the device
+    fun requestLocationUpdate(context: Context) {
+        viewModelScope.launch {
+            try {
+                isLoading = true
+                
+                // Use Google Play Services location API
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                val cancellationToken = CancellationTokenSource()
+                
+                // Request current location with high accuracy
+                val locationResult = withContext(Dispatchers.IO) {
+                    try {
+                        fusedLocationClient.getCurrentLocation(
+                            Priority.PRIORITY_HIGH_ACCURACY,
+                            cancellationToken.token
+                        ).await()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                
+                // Update location if available
+                locationResult?.let { location ->
+                    userLat = location.latitude
+                    userLng = location.longitude
+                    isLocationEnabled = true
+                    
+                    // Update the user's location in Firestore
+                    updateUserLocation(location.latitude, location.longitude)
+                } ?: run {
+                    // Try to get last known location if current location request failed
+                    val lastLocation = withContext(Dispatchers.IO) {
+                        try {
+                            fusedLocationClient.lastLocation.await()
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    
+                    lastLocation?.let { location ->
+                        userLat = location.latitude
+                        userLng = location.longitude
+                        isLocationEnabled = true
+                        
+                        // Update the user's location in Firestore
+                        updateUserLocation(location.latitude, location.longitude)
+                    } ?: run {
+                        errorMessage = "Could not get location. Please check your location settings."
+                    }
+                }
+                
+                // Reload circles with new location
+                loadNearbyCircles()
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "Unknown error occurred"
+            } finally {
+                isLoading = false
+            }
+        }
     }
     
     // Update user location

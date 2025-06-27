@@ -11,11 +11,15 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import org.osmdroid.views.MapView
 
 class CircleMapViewModel : ViewModel() {
     private val circleRepository = CircleRepository()
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    
+    // Map reference (will be set by the composable)
+    private var mapView: MapView? = null
     
     // Map state
     var circles by mutableStateOf<List<Circle>>(emptyList())
@@ -30,7 +34,7 @@ class CircleMapViewModel : ViewModel() {
     var collegeTown by mutableStateOf<String?>(null)
         private set
         
-    var mapZoom by mutableStateOf(1.0f)
+    var mapZoom by mutableStateOf(15.0)
         private set
         
     // Filter state
@@ -46,6 +50,12 @@ class CircleMapViewModel : ViewModel() {
     
     init {
         loadUserProfile()
+    }
+    
+    // Set map reference
+    fun setMapReference(map: MapView) {
+        mapView = map
+        mapZoom = map.zoomLevelDouble
     }
     
     // Load user profile data
@@ -127,6 +137,11 @@ class CircleMapViewModel : ViewModel() {
         userLat = userLat?.plus(0.001) ?: 37.7749
         userLng = userLng?.plus(0.001) ?: -122.4194
         
+        // Center map on user location
+        mapView?.let { map ->
+            map.controller.setCenter(org.osmdroid.util.GeoPoint(userLat!!, userLng!!))
+        }
+        
         // Reload circles with new location
         loadNearbyCircles()
     }
@@ -158,11 +173,17 @@ class CircleMapViewModel : ViewModel() {
     
     // Zoom controls
     fun zoomIn() {
-        mapZoom = (mapZoom * 1.2f).coerceAtMost(5.0f)
+        mapView?.let { map ->
+            map.controller.zoomIn()
+            mapZoom = map.zoomLevelDouble
+        }
     }
     
     fun zoomOut() {
-        mapZoom = (mapZoom * 0.8f).coerceAtLeast(0.5f)
+        mapView?.let { map ->
+            map.controller.zoomOut()
+            mapZoom = map.zoomLevelDouble
+        }
     }
     
     // Clear error message
