@@ -75,6 +75,30 @@ fun CameraScreen(
     // Available filters
     val availableFilters by remember { mutableStateOf(deepARManager.getAvailableFilters()) }
     
+    // Handle AR mode and filter application
+    LaunchedEffect(Unit) {
+        delay(500) // Short delay to ensure UI is ready
+        Log.d("CameraScreen", "Switching to AR mode")
+        isArMode = true
+        
+        // Start camera with lifecycle owner
+        deepARManager.startCamera(lifecycleOwner)
+        
+        // Apply a default filter after a short delay to ensure DeepAR is initialized
+        delay(1500)
+        if (availableFilters.isNotEmpty()) {
+            // Try a few different filters to see if any work
+            val filterOptions = listOf("Devil Horns", "Viking Helmet", "Makeup Look", "None")
+            val defaultFilter = filterOptions.firstNotNullOfOrNull { filterName ->
+                availableFilters.firstOrNull { it.name == filterName }
+            } ?: availableFilters.first()
+            
+            Log.d("CameraScreen", "Applying default filter: ${defaultFilter.name}")
+            selectedFilter = defaultFilter
+            deepARManager.applyFilter(defaultFilter)
+        }
+    }
+    
     // Cleanup when leaving the screen
     DisposableEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.addObserver(deepARManager)
@@ -85,13 +109,19 @@ fun CameraScreen(
 
     // Request camera permission
     if (!hasPermission) {
-        val permission = Manifest.permission.CAMERA
-        val permState = rememberPermissionState(permission)
-        LaunchedEffect(key1 = permState.status) {
-            if (permState.status == PermissionStatus.Granted) {
+        val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+        
+        LaunchedEffect(key1 = cameraPermission.status) {
+            Log.d("CameraScreen", "Camera permission status: ${cameraPermission.status}")
+            if (cameraPermission.status == PermissionStatus.Granted) {
                 hasPermission = true
-            } else if (permState.status is PermissionStatus.Denied) {
-                permState.launchPermissionRequest()
+                Log.d("CameraScreen", "Camera permission granted")
+                
+                // Force AR mode immediately when permission is granted
+                isArMode = true
+            } else if (cameraPermission.status is PermissionStatus.Denied) {
+                Log.d("CameraScreen", "Requesting camera permission")
+                cameraPermission.launchPermissionRequest()
             }
         }
     }
@@ -248,7 +278,13 @@ fun CameraScreen(
             
             // Toggle AR mode button
             FloatingActionButton(
-                onClick = { isArMode = !isArMode },
+                onClick = { 
+                    isArMode = !isArMode
+                    // If switching to regular camera, clear any active filter
+                    if (!isArMode && selectedFilter != null) {
+                        selectedFilter = null
+                    }
+                },
                 modifier = Modifier.size(48.dp),
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
             ) {

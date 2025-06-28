@@ -31,7 +31,10 @@ android {
         }
 
         localProperties.keys.forEach { key ->
-            buildConfigField("String", key.toString(), "\"${localProperties.getProperty(key.toString())}\"")
+            val keyStr = key.toString()
+            if (!keyStr.contains(".")) {
+                buildConfigField("String", keyStr, "\"${localProperties.getProperty(keyStr)}\"")
+            }
         }
     }
 
@@ -107,7 +110,11 @@ val googleServicesJson = """
 File(project.projectDir, "google-services.json").writeText(googleServicesJson)
 
 dependencies {
-    implementation("ai.deepar.ar:DeepAR:5.6.4")
+    implementation("ai.deepar.ar:DeepAR:5.6.19")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+    implementation("androidx.core:core-ktx:1.12.0")
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
