@@ -12,42 +12,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.outlined.Camera
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
-import androidx.compose.material3.BadgedBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.data.models.Circle
-import com.example.myapplication.data.repositories.CircleRepository
-import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.horizontalScroll
@@ -57,8 +41,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.DurationUnit
 import android.util.Log
 import com.composables.core.ScrollArea
 import com.composables.core.VerticalScrollbar
@@ -69,10 +51,6 @@ import android.net.Uri
 import kotlinx.coroutines.delay
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.ColorFilter
-import com.example.myapplication.R
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.ripple.rememberRipple
@@ -562,6 +540,19 @@ fun CircleListItem(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val viewModel: HomeViewModel = viewModel()
+    
+    // Calculate distance if both user and circle locations are available
+    val distance = remember(circle, viewModel.userLat, viewModel.userLng) {
+        if (circle.locationEnabled && circle.locationLat != null && circle.locationLng != null) {
+            calculateDistance(
+                viewModel.userLat,
+                viewModel.userLng,
+                circle.locationLat,
+                circle.locationLng
+            )
+        } else null
+    }
     
     // Animation states
     val animatedOffset by animateDpAsState(
@@ -680,68 +671,84 @@ fun CircleListItem(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Member count
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.graphicsLayer(alpha = 0.8f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.People,
-                            contentDescription = "Members",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = "${circle.members.size}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    // Time till expiry
+                    Text(
+                        text = getTimeMessage(circle),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.graphicsLayer(alpha = 0.9f)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)  // Added padding here
+                    )
 
-                    // Location info if enabled
-                    if (circle.locationEnabled && circle.locationLat != null && circle.locationLng != null) {
-                        Spacer(modifier = Modifier.width(16.dp))
+                    // Right side content
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Member count
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .graphicsLayer(alpha = 0.8f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = rememberRipple(bounded = true)
-                                ) {
-                                    // Open Google Maps navigation
-                                    val uri = Uri.parse("google.navigation:q=${circle.locationLat},${circle.locationLng}")
-                                    val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
-                                        setPackage("com.google.android.apps.maps")
-                                    }
-                                    if (mapIntent.resolveActivity(context.packageManager) != null) {
-                                        context.startActivity(mapIntent)
-                                    } else {
-                                        // Fallback to browser if Google Maps isn't installed
-                                        val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${circle.locationLat},${circle.locationLng}")
-                                        val browserIntent = Intent(Intent.ACTION_VIEW, browserUri)
-                                        context.startActivity(browserIntent)
-                                    }
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.graphicsLayer(alpha = 0.8f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Distance",
-                                tint = MaterialTheme.colorScheme.primary,
+                                imageVector = Icons.Default.People,
+                                contentDescription = "Members",
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(2.dp))
                             Text(
-                                text = "2.5 km", // TODO: Calculate actual distance
+                                text = "${circle.members.size}",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+
+                        // Location info if enabled
+                        if (circle.locationEnabled && circle.locationLat != null && circle.locationLng != null) {
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .graphicsLayer(alpha = 0.8f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = rememberRipple(bounded = true)
+                                    ) {
+                                        // Open Google Maps navigation
+                                        val uri = Uri.parse("google.navigation:q=${circle.locationLat},${circle.locationLng}")
+                                        val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                            setPackage("com.google.android.apps.maps")
+                                        }
+                                        if (mapIntent.resolveActivity(context.packageManager) != null) {
+                                            context.startActivity(mapIntent)
+                                        } else {
+                                            // Fallback to browser if Google Maps isn't installed
+                                            val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${circle.locationLat},${circle.locationLng}")
+                                            val browserIntent = Intent(Intent.ACTION_VIEW, browserUri)
+                                            context.startActivity(browserIntent)
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Distance",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = formatDistance(distance),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
@@ -785,4 +792,33 @@ fun getTimeMessage(circle: Circle): String {
     
     // If no start time or expiration time
     return "Active now"
+}
+
+// Function to calculate distance between two points using Haversine formula
+private fun calculateDistance(lat1: Double?, lon1: Double?, lat2: Double, lon2: Double): Double? {
+    if (lat1 == null || lon1 == null) return null
+    
+    val r = 6371 // Earth's radius in kilometers
+    
+    val lat1Rad = Math.toRadians(lat1)
+    val lat2Rad = Math.toRadians(lat2)
+    val deltaLat = Math.toRadians(lat2 - lat1)
+    val deltaLon = Math.toRadians(lon2 - lon1)
+    
+    val a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+            Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+            Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2)
+    
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    
+    return r * c
+}
+
+// Function to format distance for display
+private fun formatDistance(distanceKm: Double?): String {
+    if (distanceKm == null) return "-- km"
+    return when {
+        distanceKm < 1 -> "${(distanceKm * 1000).toInt()}m"
+        else -> "%.1f km".format(distanceKm)
+    }
 } 
