@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Date
@@ -22,6 +23,7 @@ import android.util.Log
 
 class CircleRepository {
     private val firestore: FirebaseFirestore = Firebase.firestore
+    private val storage = Firebase.storage
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     
     // Debug tag
@@ -246,7 +248,7 @@ class CircleRepository {
     suspend fun deleteCircle(circleId: String): Result<Unit> {
         return try {
             val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
-            
+    
             // Check if the circle exists and the current user is the creator
             val circleResult = getCircleById(circleId)
             if (circleResult.isFailure) {
@@ -258,11 +260,34 @@ class CircleRepository {
                 return Result.failure(IllegalStateException("Only the creator can delete this circle"))
             }
             
-            // Delete the circle
-            firestore.collection(CIRCLES_COLLECTION)
-                .document(circleId)
-                .delete()
+            // First, get all snaps for this circle
+            val snapsQuery = firestore.collection("snaps")
+                .whereEqualTo("circleId", circleId)
+                .get()
                 .await()
+            
+            // Delete all snaps in a batch
+            val batch = firestore.batch()
+            snapsQuery.documents.forEach { snapDoc ->
+                batch.delete(snapDoc.reference)
+                
+                // Also delete the snap media from storage if it exists
+                val mediaUrl = snapDoc.getString("mediaUrl")
+                if (mediaUrl != null) {
+                    try {
+                        storage.getReferenceFromUrl(mediaUrl).delete().await()
+                    } catch (e: Exception) {
+                        // Log but don't fail if media deletion fails
+                        println("Failed to delete media for snap ${snapDoc.id}: ${e.message}")
+                    }
+                }
+            }
+            
+            // Delete the circle document
+            batch.delete(firestore.collection(CIRCLES_COLLECTION).document(circleId))
+            
+            // Commit the batch
+            batch.commit().await()
                 
             Result.success(Unit)
         } catch (e: Exception) {

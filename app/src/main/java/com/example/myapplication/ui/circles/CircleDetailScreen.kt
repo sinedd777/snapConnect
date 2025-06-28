@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -92,6 +93,7 @@ fun CircleDetailScreen(
     
     // State
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     var inviteEmail by remember { mutableStateOf("") }
     
     // Load data
@@ -125,6 +127,11 @@ fun CircleDetailScreen(
                 },
                 actions = {
                     if (viewModel.isCreator) {
+                        // Delete button
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Circle")
+                        }
+                        // Invite button
                         IconButton(onClick = { showInviteDialog = true }) {
                             Icon(Icons.Default.PersonAdd, contentDescription = "Invite Members")
                         }
@@ -294,6 +301,44 @@ fun CircleDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showInviteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Add delete confirmation dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Circle") },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete this circle? This action cannot be undone and all snaps in this circle will be deleted.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            viewModel.deleteCircle()
+                            if (viewModel.errorMessage == null) {
+                                kotlinx.coroutines.delay(1000) // Add 1 second delay
+                                onBack()
+                            }
+                            showDeleteDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel")
                 }
             }
