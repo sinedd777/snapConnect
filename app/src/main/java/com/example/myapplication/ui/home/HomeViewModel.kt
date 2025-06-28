@@ -69,6 +69,10 @@ class HomeViewModel : ViewModel() {
     // Debug flag
     private val isDebugMode = false
     
+    // Sort state
+    var currentSort by mutableStateOf("Distance")
+        private set
+    
     init {
         loadUserProfile()
     }
@@ -293,5 +297,41 @@ class HomeViewModel : ViewModel() {
     // Clear error message
     fun clearError() {
         errorMessage = null
+    }
+    
+    // Sort circles by distance from user's location
+    fun sortCirclesByDistance() {
+        circles = circles.sortedBy { circle ->
+            if (circle.locationLat != null && circle.locationLng != null && userLat != null && userLng != null) {
+                calculateDistance(
+                    userLat!!,
+                    userLng!!,
+                    circle.locationLat,
+                    circle.locationLng
+                )
+            } else Float.POSITIVE_INFINITY
+        }
+    }
+
+    // Sort circles by member count
+    fun sortCirclesByMembers() {
+        circles = circles.sortedByDescending { circle ->
+            circle.members.size
+        }
+    }
+
+    // Sort circles by time to expiry
+    fun sortCirclesByTimeToExpiry() {
+        val now = System.currentTimeMillis()
+        circles = circles.sortedBy { circle ->
+            circle.expiresAt?.toDate()?.time?.minus(now) ?: Long.MAX_VALUE
+        }
+    }
+
+    // Helper function to calculate distance between two points
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
+        val results = FloatArray(1)
+        Location.distanceBetween(lat1, lon1, lat2, lon2, results)
+        return results[0]
     }
 } 

@@ -94,9 +94,9 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
-    // Filter state
-    var selectedFilter by remember { mutableStateOf("All") }
-    val filterOptions = listOf("All", "Active", "Upcoming", "Public", "Private")
+    // Sort state
+    var selectedSort by remember { mutableStateOf("Distance") }
+    val sortOptions = listOf("Distance", "Members", "Time")
     
     // Fullscreen map state
     var isMapFullscreen by remember { mutableStateOf(false) }
@@ -215,9 +215,13 @@ fun HomeScreen(
     }
     
     // Filter change handler with debug logging
-    LaunchedEffect(selectedFilter) {
-        Log.d(TAG, "Filter changed to: $selectedFilter")
-        viewModel.setFilter(selectedFilter)
+    LaunchedEffect(selectedSort) {
+        Log.d(TAG, "Filter changed to: $selectedSort")
+        when (selectedSort) {
+            "Distance" -> viewModel.sortCirclesByDistance()
+            "Members" -> viewModel.sortCirclesByMembers()
+            "Time" -> viewModel.sortCirclesByTimeToExpiry()
+        }
     }
     
     // Function to handle circle selection
@@ -439,20 +443,38 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .weight(1f) // Take remaining space in parent Column
                     ) {
-                        // Filter chips
+                        // Sort chips with icon
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp) // Reduced vertical padding
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            filterOptions.forEach { filter ->
+                            // Sort icon
+                            Icon(
+                                imageVector = Icons.Default.Sort,
+                                contentDescription = "Sort",
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(end = 4.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            sortOptions.forEach { sort ->
                                 FilterChip(
-                                    selected = selectedFilter == filter,
-                                    onClick = { selectedFilter = filter },
-                                    label = { Text(filter) },
-                                    leadingIcon = if (selectedFilter == filter) {
+                                    selected = selectedSort == sort,
+                                    onClick = { 
+                                        selectedSort = sort
+                                        when (sort) {
+                                            "Distance" -> viewModel.sortCirclesByDistance()
+                                            "Members" -> viewModel.sortCirclesByMembers()
+                                            "Time" -> viewModel.sortCirclesByTimeToExpiry()
+                                        }
+                                    },
+                                    label = { Text(sort) },
+                                    leadingIcon = if (selectedSort == sort) {
                                         { Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp)) }
                                     } else null
                                 )
