@@ -110,6 +110,7 @@ val googleServicesJson = """
 File(project.projectDir, "google-services.json").writeText(googleServicesJson)
 
 dependencies {
+    implementation("com.composables:core:1.36.1")
     implementation("ai.deepar.ar:DeepAR:5.6.19")
     implementation("androidx.camera:camera-camera2:1.3.1")
     implementation("androidx.camera:camera-lifecycle:1.3.1")

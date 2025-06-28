@@ -6,12 +6,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +60,22 @@ import androidx.core.content.ContextCompat
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.DurationUnit
 import android.util.Log
+import com.composables.core.ScrollArea
+import com.composables.core.VerticalScrollbar
+import com.composables.core.Thumb
+import com.composables.core.rememberScrollAreaState
+import android.content.Intent
+import android.net.Uri
+import kotlinx.coroutines.delay
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.ColorFilter
+import com.example.myapplication.R
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.ripple.rememberRipple
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,9 +101,6 @@ fun HomeScreen(
     // Fullscreen map state
     var isMapFullscreen by remember { mutableStateOf(false) }
     
-    // Bottom sheet state
-    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    var showBottomSheet by remember { mutableStateOf(false) }
     
     // Animation values
     val mapHeight by animateDpAsState(
@@ -210,12 +226,8 @@ fun HomeScreen(
         onOpenSnapViewer(circleId) // For now, reuse the snap viewer navigation
     }
     
-    // Debug: Track bottom sheet visibility
-    LaunchedEffect(viewModel.circles, isMapFullscreen) {
-        val shouldShow = viewModel.circles.isNotEmpty() && !isMapFullscreen
-        Log.d(TAG, "Bottom sheet visibility update - Should show: $shouldShow, Circles: ${viewModel.circles.size}, Fullscreen: $isMapFullscreen")
-        showBottomSheet = shouldShow
-    }
+    
+    // Handle bottom sheet dismissal
     
     Scaffold(
         topBar = {
@@ -422,45 +434,94 @@ fun HomeScreen(
                 
                 // Content below map (only visible when not fullscreen)
                 if (!isMapFullscreen) {
-                    // Filter chips
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .weight(1f) // Take remaining space in parent Column
                     ) {
-                        filterOptions.forEach { filter ->
-                            FilterChip(
-                                selected = selectedFilter == filter,
-                                onClick = { selectedFilter = filter },
-                                label = { Text(filter) },
-                                leadingIcon = if (selectedFilter == filter) {
-                                    { Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp)) }
-                                } else null
-                            )
+                        // Filter chips
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp) // Reduced vertical padding
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            filterOptions.forEach { filter ->
+                                FilterChip(
+                                    selected = selectedFilter == filter,
+                                    onClick = { selectedFilter = filter },
+                                    label = { Text(filter) },
+                                    leadingIcon = if (selectedFilter == filter) {
+                                        { Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp)) }
+                                    } else null
+                                )
+                            }
                         }
-                    }
-                    
-                    // Empty state if no circles
-                    if (viewModel.circles.isEmpty()) {
+
+                        // Circles list
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
                         ) {
                             if (viewModel.isLoading) {
-                                CircularProgressIndicator()
-                            } else {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            } else if (viewModel.circles.isEmpty()) {
                                 Column(
+                                    modifier = Modifier.align(Alignment.Center),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Text(
                                         text = "No circles found nearby",
-                                        style = MaterialTheme.typography.bodyLarge
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        textAlign = TextAlign.Center
                                     )
+                                }
+                            } else {
+                                val lazyListState = rememberLazyListState()
+                                val scrollAreaState = rememberScrollAreaState(lazyListState)
+
+                                ScrollArea(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = 4.dp),
+                                    state = scrollAreaState
+                                ) {
+                                    LazyColumn(
+                                        state = lazyListState,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        contentPadding = PaddingValues(vertical = 4.dp)
+                                    ) {
+                                        items(viewModel.circles) { circle ->
+                                            CircleListItem(
+                                                circle = circle,
+                                                onClick = { onOpenCircleDetail(circle.id) }
+                                            )
+                                        }
+                                    }
+
+                                    VerticalScrollbar(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .fillMaxHeight()
+                                            .padding(4.dp)
+                                            .width(8.dp)
+                                    ) {
+                                        Thumb(
+                                            modifier = Modifier
+                                                .background(
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -468,213 +529,6 @@ fun HomeScreen(
                 }
             }
             
-            // Bottom Sheet for Circles
-            if (showBottomSheet && !isMapFullscreen && viewModel.circles.isNotEmpty()) {
-                Log.d(TAG, "Showing bottom sheet with ${viewModel.circles.size} circles")
-                ModalBottomSheet(
-                    onDismissRequest = { 
-                        Log.d(TAG, "Bottom sheet dismissed")
-                        showBottomSheet = false 
-                    },
-                    sheetState = bottomSheetState,
-                    dragHandle = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Drag handle
-                            Box(
-                                modifier = Modifier
-                                    .width(40.dp)
-                                    .height(4.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                        RoundedCornerShape(2.dp)
-                                    )
-                                    .padding(vertical = 16.dp)
-                            )
-                            
-                            // Title
-                            Text(
-                                text = "Nearby Circles",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-                ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 32.dp), // Extra padding at the bottom
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(viewModel.circles) { circle ->
-                            Log.d(TAG, "Rendering circle in bottom sheet - ID: ${circle.id}")
-                            CircleBottomSheetItem(
-                                circle = circle,
-                                onClick = { 
-                                    Log.d(TAG, "Circle clicked in bottom sheet - ID: ${circle.id}")
-                                    onOpenCircleDetail(circle.id) 
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CircleBottomSheetItem(
-    circle: Circle,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (circle.private) 
-                MaterialTheme.colorScheme.secondaryContainer 
-            else 
-                MaterialTheme.colorScheme.primaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Circle icon with category-based icon
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (circle.private) 
-                            MaterialTheme.colorScheme.secondary 
-                        else 
-                            MaterialTheme.colorScheme.primary
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = when (circle.category) {
-                        "Party" -> Icons.Default.Celebration
-                        "Study" -> Icons.Default.School
-                        "Sports" -> Icons.Default.SportsSoccer
-                        "Food" -> Icons.Default.Restaurant
-                        "Music" -> Icons.Default.MusicNote
-                        else -> Icons.Default.Groups
-                    },
-                    contentDescription = null,
-                    tint = if (circle.private) 
-                        MaterialTheme.colorScheme.onSecondary 
-                    else 
-                        MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Circle info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = circle.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // Time-related message
-                val timeMessage = getTimeMessage(circle)
-                Text(
-                    text = timeMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = when {
-                        timeMessage.contains("Starting") -> MaterialTheme.colorScheme.tertiary
-                        timeMessage.contains("Ends") -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // Participants count
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${circle.members.size} participants",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    if (circle.locationEnabled && circle.locationRadius != null) {
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${circle.locationRadius.toInt()}m radius",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            
-            // Privacy indicator and action button
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.height(56.dp)
-            ) {
-                Icon(
-                    imageVector = if (circle.private) Icons.Default.Lock else Icons.Default.Public,
-                    contentDescription = if (circle.private) "Private" else "Public",
-                    tint = if (circle.private) 
-                        MaterialTheme.colorScheme.onSecondaryContainer 
-                    else 
-                        MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                
-                FilledTonalIconButton(
-                    onClick = onClick,
-                    modifier = Modifier.size(32.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (circle.private) 
-                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f) 
-                        else 
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "View Circle",
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
         }
     }
 }
@@ -684,76 +538,191 @@ fun CircleListItem(
     circle: Circle,
     onClick: () -> Unit
 ) {
-    Card(
+    var isExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    // Animation states
+    val animatedOffset by animateDpAsState(
+        targetValue = if (isExpanded) 12.dp else 0.dp,
+        animationSpec = tween(300),
+        label = "textOffset"
+    )
+    
+    // Marquee animation
+    val textScrollState = rememberScrollState()
+    
+    // Reset scroll when collapsed
+    LaunchedEffect(isExpanded) {
+        if (!isExpanded) {
+            textScrollState.scrollTo(0)
+        }
+    }
+    
+    // Start marquee animation when expanded
+    LaunchedEffect(isExpanded) {
+        if (isExpanded) {
+            while (true) {
+                delay(1000)
+                textScrollState.animateScrollTo(
+                    value = textScrollState.maxValue,
+                    animationSpec = tween(
+                        durationMillis = 3000,
+                        easing = LinearEasing
+                    )
+                )
+                delay(1000)
+                textScrollState.animateScrollTo(
+                    value = 0,
+                    animationSpec = tween(
+                        durationMillis = 500,
+                        easing = LinearEasing
+                    )
+                )
+                delay(500)
+            }
+        }
+    }
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (circle.private) 
-                MaterialTheme.colorScheme.secondaryContainer 
-            else 
-                MaterialTheme.colorScheme.primaryContainer
-        )
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { isExpanded = !isExpanded },
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = if (isExpanded) 2.dp else 1.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(12.dp)
         ) {
-            // Circle icon
-            Box(
+            // Main content row with animated offset
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        if (circle.private) 
-                            MaterialTheme.colorScheme.secondary 
-                        else 
-                            MaterialTheme.colorScheme.primary
-                    ),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .offset(x = animatedOffset),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = circle.name.first().toString(),
-                    color = if (circle.private) 
-                        MaterialTheme.colorScheme.onSecondary 
-                    else 
-                        MaterialTheme.colorScheme.onPrimary
-                )
+                // Name and description in single line
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(
+                            state = if (isExpanded) textScrollState else rememberScrollState(),
+                            enabled = isExpanded
+                        ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = circle.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    
+                    if (circle.private) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Private",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    if (!circle.description.isNullOrBlank()) {
+                        Text(
+                            text = " • ",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = circle.description,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        if (isExpanded) {
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+                    }
+                }
             }
             
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Circle info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = circle.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Text(
-                    text = "${circle.members.size} members" + 
-                        if (circle.locationEnabled && circle.locationRadius != null) 
-                            " • ${circle.locationRadius.toInt()}m radius" 
-                        else "",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            
-            // Privacy indicator
-            if (circle.private) {
-                Icon(
-                    Icons.Default.Lock,
-                    contentDescription = "Private",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            } else {
-                Icon(
-                    Icons.Default.Public,
-                    contentDescription = "Public",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            // Expandable details
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Member count
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.graphicsLayer(alpha = 0.8f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.People,
+                            contentDescription = "Members",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "${circle.members.size}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Location info if enabled
+                    if (circle.locationEnabled && circle.locationLat != null && circle.locationLng != null) {
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .graphicsLayer(alpha = 0.8f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = rememberRipple(bounded = true)
+                                ) {
+                                    // Open Google Maps navigation
+                                    val uri = Uri.parse("google.navigation:q=${circle.locationLat},${circle.locationLng}")
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                        setPackage("com.google.android.apps.maps")
+                                    }
+                                    if (mapIntent.resolveActivity(context.packageManager) != null) {
+                                        context.startActivity(mapIntent)
+                                    } else {
+                                        // Fallback to browser if Google Maps isn't installed
+                                        val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${circle.locationLat},${circle.locationLng}")
+                                        val browserIntent = Intent(Intent.ACTION_VIEW, browserUri)
+                                        context.startActivity(browserIntent)
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Distance",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = "2.5 km", // TODO: Calculate actual distance
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -39,12 +39,6 @@ fun CircleMapScreen(
         viewModel.loadNearbyCircles()
     }
     
-    // Check for empty state and create test data
-    LaunchedEffect(viewModel.circles) {
-        if (!viewModel.isLoading && viewModel.circles.isEmpty()) {
-            viewModel.createTestDataIfNeeded()
-        }
-    }
     
     // Error handling
     LaunchedEffect(viewModel.errorMessage) {

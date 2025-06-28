@@ -112,32 +112,12 @@ class HomeViewModel : ViewModel() {
                 
                 Log.d(TAG, "Loading circles for location: ($lat, $lng)")
                 Log.d(TAG, "Current filter: $currentFilter")
-                Log.d(TAG, "College town: $collegeTown")
                 
-                // If we have a college town, prioritize that for fetching circles
-                val result = if (collegeTown != null) {
-                    Log.d(TAG, "Fetching circles for college town: $collegeTown")
-                    circleRepository.getCollegeTownCircles(collegeTown!!)
-                } else {
-                    Log.d(TAG, "Fetching nearby circles within 1km radius")
-                    circleRepository.getNearbyCircles(lat, lng)
-                }
+                val result = circleRepository.getNearbyCircles(lat, lng)
                 
                 if (result.isSuccess) {
                     var allCircles = result.getOrNull() ?: emptyList()
                     Log.d(TAG, "Loaded ${allCircles.size} circles before filtering")
-                    
-                    // If no circles found, create test circles
-                    if (allCircles.isEmpty()) {
-                        Log.d(TAG, "No circles found, creating test circles")
-                        val testResult = circleRepository.createTestCircles(lat, lng)
-                        if (testResult.isSuccess) {
-                            allCircles = testResult.getOrNull() ?: emptyList()
-                            Log.d(TAG, "Created ${allCircles.size} test circles")
-                        } else {
-                            Log.e(TAG, "Failed to create test circles: ${testResult.exceptionOrNull()?.message}")
-                        }
-                    }
                     
                     // Log each circle's details
                     allCircles.forEach { circle ->
@@ -181,46 +161,7 @@ class HomeViewModel : ViewModel() {
     }
     
     // Create test circles for debugging purposes
-    private fun createTestCirclesIfNeeded(lat: Double, lng: Double) {
-        if (!isDebugMode) return
-        
-        viewModelScope.launch {
-            try {
-                Log.d("HomeViewModel", "Creating test circles near: $lat, $lng")
-                
-                // Create a test circle at the user's location
-                val circle1 = circleRepository.createCircle(
-                    name = "Test Circle 1",
-                    description = "A test circle for debugging",
-                    durationMillis = CircleRepository.DURATION_24_HOURS,
-                    private = false,
-                    locationEnabled = true,
-                    locationLat = lat,
-                    locationLng = lng,
-                    locationRadius = 100.0
-                )
-                
-                // Create another test circle nearby
-                val circle2 = circleRepository.createCircle(
-                    name = "Test Circle 2",
-                    description = "Another test circle for debugging",
-                    durationMillis = CircleRepository.DURATION_48_HOURS,
-                    private = true,
-                    locationEnabled = true,
-                    locationLat = lat + 0.002, // Slightly north
-                    locationLng = lng + 0.002, // Slightly east
-                    locationRadius = 150.0
-                )
-                
-                // Reload circles after creating test data
-                loadNearbyCircles()
-                
-                Log.d("HomeViewModel", "Created test circles successfully")
-            } catch (e: Exception) {
-                Log.e("HomeViewModel", "Error creating test circles: ${e.message}")
-            }
-        }
-    }
+    
     
     // Update filter and reload circles
     fun setFilter(filter: String) {

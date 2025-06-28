@@ -99,17 +99,9 @@ class CircleMapViewModel : ViewModel() {
                 Log.d(TAG, """Loading circles:
                     |Location: ($lat, $lng)
                     |Current filter: $currentFilter
-                    |College town: $collegeTown
                     |Current circles: ${circles.size}""".trimMargin())
                 
-                // If we have a college town, prioritize that for fetching circles
-                val result = if (collegeTown != null) {
-                    Log.d(TAG, "Fetching circles for college town: $collegeTown")
-                    circleRepository.getCollegeTownCircles(collegeTown!!)
-                } else {
-                    Log.d(TAG, "Fetching nearby circles within 1km radius")
-                    circleRepository.getNearbyCircles(lat, lng)
-                }
+                val result = circleRepository.getNearbyCircles(lat, lng)
                 
                 if (result.isSuccess) {
                     val allCircles = result.getOrNull() ?: emptyList()
@@ -260,65 +252,5 @@ class CircleMapViewModel : ViewModel() {
         errorMessage = null
     }
     
-    // Create test circles for debugging
-    private fun createTestCircles() {
-        viewModelScope.launch {
-            try {
-                Log.d(TAG, "Creating test circles...")
-                
-                // Use current location or default to Berkeley
-                val lat = userLat ?: 37.8715
-                val lng = userLng ?: -122.2730
-                
-                // Create a test circle at the user's location
-                val result1 = circleRepository.createCircle(
-                    name = "Test Circle 1",
-                    description = "A test circle for debugging",
-                    durationMillis = CircleRepository.DURATION_24_HOURS,
-                    private = false,
-                    locationEnabled = true,
-                    locationLat = lat,
-                    locationLng = lng,
-                    locationRadius = 100.0
-                )
-                
-                if (result1.isSuccess) {
-                    Log.d(TAG, "Successfully created test circle 1")
-                } else {
-                    Log.e(TAG, "Failed to create test circle 1: ${result1.exceptionOrNull()?.message}")
-                }
-                
-                // Create another test circle nearby
-                val result2 = circleRepository.createCircle(
-                    name = "Test Circle 2",
-                    description = "Another test circle for debugging",
-                    durationMillis = CircleRepository.DURATION_48_HOURS,
-                    private = false,
-                    locationEnabled = true,
-                    locationLat = lat + 0.002, // Slightly north
-                    locationLng = lng + 0.002, // Slightly east
-                    locationRadius = 150.0
-                )
-                
-                if (result2.isSuccess) {
-                    Log.d(TAG, "Successfully created test circle 2")
-                } else {
-                    Log.e(TAG, "Failed to create test circle 2: ${result2.exceptionOrNull()?.message}")
-                }
-                
-                // Reload circles to see the new ones
-                loadNearbyCircles()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error creating test circles: ${e.message}", e)
-            }
-        }
-    }
     
-    // Function to create test data if needed
-    fun createTestDataIfNeeded() {
-        if (circles.isEmpty()) {
-            Log.d(TAG, "No circles found, creating test data...")
-            createTestCircles()
-        }
-    }
 } 
