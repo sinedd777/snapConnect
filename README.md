@@ -1,7 +1,7 @@
 # SnapConnect
 
-SnapConnect is an Android application built with Kotlin and Jetpack Compose that lets friends share **ephemeral photos & videos** in a quick, privacy-centric way.  
-The project is **work-in-progress** – the current milestone focuses on getting the core authentication flow running on real devices so the rest of the product can iterate quickly.
+SnapConnect is an Android application built with Kotlin and Jetpack Compose that lets friends share **ephemeral photos & videos** with AR filters in a quick, privacy-centric way.  
+The project is **work-in-progress** – the current milestone focuses on camera functionality with AR filters and the authentication flow.
 
 ---
 
@@ -11,10 +11,11 @@ The project is **work-in-progress** – the current milestone focuses on getting
 |------|--------|---------|
 | **Authentication (e-mail / password)** | ✅ Implemented | Firebase Auth powered sign-in & sign-up screens built with Compose. |
 | **UI Theme** | ✅ Implemented | Material 3 theme, colour & typography system. |
-| **Navigation** | ✅ Basic | Screen switching between Sign-In and Sign-Up. |
+| **Navigation** | ✅ Basic | Screen switching between Sign-In, Sign-Up, and Camera. |
+| **Camera with AR Filters** | ✅ Implemented | DeepAR integration with multiple face filters. |
 | **Project scaffolding** | ✅ Implemented | Gradle 8, Kotlin 2, Compose BOM, AGP 8.1. |
 
-> Road-map highlights: CameraX capture, AR filters, friend management, self-destructing snaps & push notifications (see `.cursor/memory-bank/progress.md`).
+> Road-map highlights: Friend management, self-destructing snaps & push notifications (see `.cursor/memory-bank/progress.md`).
 
 ---
 
@@ -66,24 +67,67 @@ sdk_dir=<path-to-android-sdk>
 ./gradlew installDebug                  # deploy to default device
 ```
 
-### 5&nbsp;·&nbsp;Sign in
+### 5&nbsp;·&nbsp;Test the app
 
-Launch the app on your emulator/device and use the Sign-Up screen to create an account. Sign-In afterwards to verify everything works.
+Launch the app on your emulator/device and:
+1. Use the Sign-Up screen to create an account
+2. Sign in with your credentials
+3. Test the camera functionality with AR filters (requires camera permission)
 
 ---
 
-## 💡  Project Structure (high-level)
+## 📱 Features
+
+### AR Filters with DeepAR
+
+The app integrates DeepAR SDK to provide augmented reality face filters:
+
+- 17+ AR filters including masks, effects, and animations
+- Real-time face tracking and filter application
+- Screenshot capability
+- Filter carousel UI for easy selection
+
+Camera permissions are required for AR functionality.
+
+---
+
+## 💡  Project Structure
 
 ```text
 app/
  ├── build.gradle.kts          # Android module config
  ├── src/main/
  │    ├── java/com/example/myapplication/
- │    │       └── ui/auth/…   # Compose auth screens
- │    └── res/…               # M3 theming & assets
- └── …
+ │    │    ├── ui/auth/        # Compose auth screens
+ │    │    ├── ui/camera/      # Camera screen & DeepAR integration
+ │    │    └── ui/camera/filters/ # AR filter management
+ │    ├── assets/              # AR filter assets
+ │    └── res/                 # M3 theming & assets
+ └── libs/                     # DeepAR SDK
 ```
 
 Configuration, architecture & roadmap live under `.cursor/memory-bank/` – start with `projectbrief.md` for full vision.
+
+---
+
+## 🧪 Development
+
+### Running Tests
+
+```bash
+./gradlew test                 # Run unit tests
+./gradlew connectedAndroidTest  # Run instrumented tests
+```
+
+### Debugging
+
+- Use Android Studio's built-in debugger
+- Logcat output includes DeepAR debug information (filter by "DeepARManager" tag)
+
+---
+
+## 📄 License
+
+This project uses the DeepAR SDK which requires a license key for production use. The current implementation includes a development license.
 
 ---
