@@ -1,5 +1,10 @@
 package com.example.myapplication.ui.circles
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +49,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,12 +61,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.data.models.Circle
+import com.example.myapplication.ui.theme.SnapBlue
+import com.example.myapplication.ui.theme.Success
+import com.example.myapplication.ui.theme.Error
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -87,13 +98,11 @@ fun CirclesScreen(
     }
     
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Circles") }
-            )
-        },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp
+            ) {
                 NavigationBarItem(
                     selected = false,
                     onClick = onOpenHome,
@@ -123,11 +132,16 @@ fun CirclesScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateCircle,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = SnapBlue,
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier.semantics {
+                    contentDescription = "Create new circle"
+                }
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Create Circle"
+                    contentDescription = null // Already provided in parent
                 )
             }
         }
@@ -137,7 +151,11 @@ fun CirclesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            TabRow(selectedTabIndex = selectedTabIndex) {
+            TabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = SnapBlue
+            ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTabIndex == index,
@@ -147,7 +165,12 @@ fun CirclesScreen(
                                 BadgedBox(
                                     badge = {
                                         Badge { 
-                                            Text(text = viewModel.invitations.size.toString())
+                                            Text(
+                                                text = viewModel.invitations.size.toString(),
+                                                modifier = Modifier.semantics {
+                                                    contentDescription = "${viewModel.invitations.size} pending invitations"
+                                                }
+                                            )
                                         }
                                     }
                                 ) {
@@ -161,13 +184,24 @@ fun CirclesScreen(
                 }
             }
             
-            when (selectedTabIndex) {
-                0 -> MyCirclesTab(
+            AnimatedVisibility(
+                visible = selectedTabIndex == 0,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                MyCirclesTab(
                     circles = viewModel.circles,
                     isLoading = viewModel.isLoading,
                     onCircleSelected = onCircleSelected
                 )
-                1 -> InvitationsTab(
+            }
+            
+            AnimatedVisibility(
+                visible = selectedTabIndex == 1,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                InvitationsTab(
                     invitations = viewModel.invitations,
                     isLoading = viewModel.isLoading,
                     onAccept = { circleId -> onInvitationAction(circleId, true) },
@@ -184,86 +218,49 @@ fun MyCirclesTab(
     isLoading: Boolean,
     onCircleSelected: (String) -> Unit
 ) {
-    if (isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
-    } else if (circles.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = SnapBlue
+            )
+        } else if (circles.isEmpty()) {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = "No Circles Yet",
-                    style = MaterialTheme.typography.headlineSmall
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Create a new Circle to share moments with friends",
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(circles) { circle ->
-                CircleCard(
-                    circle = circle,
-                    onClick = { onCircleSelected(circle.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun InvitationsTab(
-    invitations: List<Circle>,
-    isLoading: Boolean,
-    onAccept: (String) -> Unit,
-    onDecline: (String) -> Unit
-) {
-    if (isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
-    } else if (invitations.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No pending invitations",
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(invitations) { circle ->
-                InvitationCard(
-                    circle = circle,
-                    onAccept = { onAccept(circle.id) },
-                    onDecline = { onDecline(circle.id) }
-                )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp)
+            ) {
+                items(
+                    items = circles,
+                    key = { it.id }
+                ) { circle ->
+                    CircleCard(
+                        circle = circle,
+                        onClick = { onCircleSelected(circle.id) }
+                    )
+                }
             }
         }
     }
@@ -277,46 +274,38 @@ fun CircleCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(16.dp)
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = "Circle ${circle.name} with ${circle.members.size} members"
+            },
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(12.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Circle avatar/icon
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = circle.name.first().toString(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = circle.name,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     
                     circle.description?.let {
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -328,14 +317,17 @@ fun CircleCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.semantics {
+                    contentDescription = "${circle.members.size} members, ${if (circle.locationEnabled) "location enabled" else "location disabled"}"
+                }
             ) {
                 Icon(
                     imageVector = Icons.Default.People,
-                    contentDescription = "Members",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
@@ -353,7 +345,7 @@ fun CircleCard(
                 if (circle.locationEnabled) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Location enabled",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
@@ -372,15 +364,78 @@ fun CircleCard(
 }
 
 @Composable
+fun InvitationsTab(
+    invitations: List<Circle>,
+    isLoading: Boolean,
+    onAccept: (String) -> Unit,
+    onDecline: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = SnapBlue
+            )
+        } else if (invitations.isEmpty()) {
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "No Pending Invitations",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "When someone invites you to their circle, it will appear here",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp)
+            ) {
+                items(
+                    items = invitations,
+                    key = { it.id }
+                ) { circle ->
+                    InvitationCard(
+                        circle = circle,
+                        onAccept = { onAccept(circle.id) },
+                        onDecline = { onDecline(circle.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun InvitationCard(
     circle: Circle,
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(16.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Invitation to join ${circle.name} circle with ${circle.members.size} members"
+            },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -388,7 +443,7 @@ fun InvitationCard(
             Text(
                 text = "Circle Invitation",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = SnapBlue
             )
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -396,13 +451,17 @@ fun InvitationCard(
             Text(
                 text = circle.name,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             
             circle.description?.let {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             
@@ -413,7 +472,7 @@ fun InvitationCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.People,
-                    contentDescription = "Members",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
@@ -433,70 +492,71 @@ fun InvitationCard(
             }
             
             Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
+            
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(1.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Spacer(modifier = Modifier.height(1.dp))
+            }
+            
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp),
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
+                    color = Error.copy(alpha = 0.1f),
                     onClick = onDecline
                 ) {
                     Row(
                         modifier = Modifier
-                            .padding(8.dp)
+                            .padding(12.dp)
                             .fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Decline",
-                            tint = MaterialTheme.colorScheme.onErrorContainer
+                            contentDescription = null,
+                            tint = Error
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Decline",
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            color = Error,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
                 
                 Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp),
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = Success.copy(alpha = 0.1f),
                     onClick = onAccept
                 ) {
                     Row(
                         modifier = Modifier
-                            .padding(8.dp)
+                            .padding(12.dp)
                             .fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = "Accept",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            contentDescription = null,
+                            tint = Success
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Accept",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = Success,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -511,35 +571,32 @@ fun ExpirationBadge(expiresAt: Timestamp) {
     val remainingMs = expiresAt.seconds * 1000 - now.seconds * 1000
     val remainingHours = TimeUnit.MILLISECONDS.toHours(remainingMs)
     
-    val badgeColor = when {
-        remainingHours < 1 -> MaterialTheme.colorScheme.error
-        remainingHours < 24 -> MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-        remainingHours < 48 -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
-    }
-    
-    val text = when {
-        remainingHours < 1 -> "Expires soon"
-        remainingHours < 24 -> "Expires in ${remainingHours}h"
-        remainingHours < 48 -> "Expires tomorrow"
-        remainingHours < 72 -> "Expires in 2 days"
-        remainingHours < 168 -> "Expires in ${TimeUnit.MILLISECONDS.toDays(remainingMs)} days"
+    val (badgeColor, text) = when {
+        remainingHours < 1 -> Error to "Expires soon"
+        remainingHours < 24 -> Error.copy(alpha = 0.7f) to "Expires in ${remainingHours}h"
+        remainingHours < 48 -> MaterialTheme.colorScheme.tertiary to "Expires tomorrow"
+        remainingHours < 72 -> MaterialTheme.colorScheme.tertiary to "Expires in 2 days"
+        remainingHours < 168 -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f) to "Expires in ${TimeUnit.MILLISECONDS.toDays(remainingMs)} days"
         else -> {
             val sdf = SimpleDateFormat("MMM d", Locale.getDefault())
-            "Expires ${sdf.format(Date(expiresAt.seconds * 1000))}"
+            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f) to "Expires ${sdf.format(Date(expiresAt.seconds * 1000))}"
         }
     }
     
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = badgeColor,
+        color = badgeColor.copy(alpha = 0.1f),
         modifier = Modifier.padding(start = 8.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            color = badgeColor,
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics {
+                    contentDescription = text
+                }
         )
     }
 } 

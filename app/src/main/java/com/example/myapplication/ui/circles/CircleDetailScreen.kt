@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -125,14 +124,12 @@ fun CircleDetailScreen(
                     }
                 },
                 actions = {
-                    // Invite members button (only for creator)
                     if (viewModel.isCreator) {
                         IconButton(onClick = { showInviteDialog = true }) {
                             Icon(Icons.Default.PersonAdd, contentDescription = "Invite Members")
                         }
                     }
                     
-                    // Leave circle button (for members who are not the creator)
                     if (viewModel.isMember && !viewModel.isCreator) {
                         IconButton(
                             onClick = {
@@ -153,9 +150,10 @@ fun CircleDetailScreen(
         floatingActionButton = {
             if (viewModel.isMember) {
                 FloatingActionButton(
-                    onClick = { onCaptureForCircle(circleId) }
+                    onClick = { onCaptureForCircle(circleId) },
+                    containerColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = "Capture for Circle")
+                    Icon(Icons.Default.CameraAlt, contentDescription = "Take Photo")
                 }
             }
         },
@@ -166,83 +164,91 @@ fun CircleDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (viewModel.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else if (viewModel.circle == null) {
-                Text(
-                    text = "Circle not found",
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Circle info
-                    item {
-                        CircleInfoSection(
-                            circle = viewModel.circle!!,
-                            memberCount = viewModel.circle?.members?.size ?: 0
-                        )
-                    }
-                    
-                    // Location info (if enabled)
-                    if (viewModel.circle?.locationEnabled == true) {
-                        item {
-                            LocationInfoSection(
-                                latitude = viewModel.circle?.locationLat,
-                                longitude = viewModel.circle?.locationLng,
-                                radius = viewModel.circle?.locationRadius
+            when {
+                viewModel.isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                viewModel.circle == null -> {
+                    Text(
+                        text = "Circle not found",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Circle info
+                        item(key = "circle_info") {
+                            CircleInfoSection(
+                                circle = viewModel.circle!!,
+                                memberCount = viewModel.circle?.members?.size ?: 0
                             )
                         }
-                    }
-                    
-                    // Members section
-                    item {
-                        Text(
-                            text = "Members",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                    
-                    // Member list
-                    items(viewModel.members) { member ->
-                        MemberItem(
-                            user = member,
-                            isCreator = member.id == viewModel.circle?.creatorId
-                        )
-                    }
-                    
-                    // Content section
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Circle Content",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                    
-                    // Snaps
-                    if (viewModel.snaps.isEmpty()) {
-                        item {
+                        
+                        // Location info
+                        if (viewModel.circle?.locationEnabled == true) {
+                            item(key = "location_info") {
+                                LocationInfoSection(
+                                    latitude = viewModel.circle?.locationLat,
+                                    longitude = viewModel.circle?.locationLng,
+                                    radius = viewModel.circle?.locationRadius
+                                )
+                            }
+                        }
+                        
+                        // Members section
+                        item(key = "members_header") {
                             Text(
-                                text = "No content yet. Be the first to share!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp)
+                                text = "Members",
+                                style = MaterialTheme.typography.titleMedium
                             )
                         }
-                    } else {
-                        items(viewModel.snaps) { snap ->
-                            SnapItem(
-                                snap = snap,
-                                onClick = { onViewSnap(snap.id) }
+                        
+                        items(
+                            items = viewModel.members,
+                            key = { it.id }
+                        ) { member ->
+                            MemberItem(
+                                user = member,
+                                isCreator = member.id == viewModel.circle?.creatorId
                             )
+                        }
+                        
+                        // Content section
+                        item(key = "content_header") {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Circle Content",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                        
+                        if (viewModel.snaps.isEmpty()) {
+                            item(key = "empty_content") {
+                                Text(
+                                    text = "No content yet. Be the first to share!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp)
+                                )
+                            }
+                        } else {
+                            items(
+                                items = viewModel.snaps,
+                                key = { it.id }
+                            ) { snap ->
+                                SnapItem(
+                                    snap = snap,
+                                    onClick = { onViewSnap(snap.id) }
+                                )
+                            }
                         }
                     }
                 }
@@ -250,20 +256,25 @@ fun CircleDetailScreen(
         }
     }
     
-    // Invite dialog
     if (showInviteDialog) {
         AlertDialog(
             onDismissRequest = { showInviteDialog = false },
             title = { Text("Invite to Circle") },
             text = {
-                Column {
-                    Text("Enter email address to invite:")
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Enter email address to invite:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     OutlinedTextField(
                         value = inviteEmail,
                         onValueChange = { inviteEmail = it },
                         label = { Text("Email") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
                 }
             },
@@ -292,131 +303,145 @@ fun CircleDetailScreen(
 
 @Composable
 fun CircleInfoSection(circle: Circle, memberCount: Int) {
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 16.dp)
+            .padding(bottom = 16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
     ) {
-        // Description
-        if (!circle.description.isNullOrEmpty()) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            if (!circle.description.isNullOrEmpty()) {
+                Text(
+                    text = circle.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            
+            val formatter = SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault())
             Text(
-                text = circle.description,
-                style = MaterialTheme.typography.bodyMedium
+                text = "Expires: ${formatter.format(circle.expiresAt?.toDate() ?: Date())}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = if (circle.private) "Private Circle" else "Public Circle",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Text(
+                text = "$memberCount member${if (memberCount != 1) "s" else ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        
-        // Expiration
-        val formatter = SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault())
-        Text(
-            text = "Expires: ${formatter.format(circle.expiresAt?.toDate() ?: Date())}",
-            style = MaterialTheme.typography.bodySmall
-        )
-        
-        // Privacy
-        Text(
-            text = if (circle.private) "Private Circle" else "Public Circle",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        
-        // Member count
-        Text(
-            text = "$memberCount member${if (memberCount != 1) "s" else ""}",
-            style = MaterialTheme.typography.bodySmall
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        )
     }
 }
 
 @Composable
 fun LocationInfoSection(latitude: Double?, longitude: Double?, radius: Double?) {
     if (latitude != null && longitude != null && radius != null) {
-        Column(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
+                .padding(bottom = 16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
         ) {
-            Text(
-                text = "Location-Based Circle",
-                style = MaterialTheme.typography.titleSmall
-            )
-            
-            Text(
-                text = "Content is only visible when you're within ${radius.toInt()} meters of the circle location.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            
-            // Here you could add a small map preview if desired
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Location-Based Circle",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Content is only visible within ${radius.toInt()} meters of the circle location.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
 @Composable
 fun MemberItem(user: User, isCreator: Boolean) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 4.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp
     ) {
-        // Profile picture
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (user.profilePictureUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(user.profilePictureUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Profile picture",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = user.username?.firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.titleMedium
-                )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (user.profilePictureUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(user.profilePictureUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Profile picture",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = user.username?.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
-        }
-        
-        // User info
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp)
-        ) {
-            Text(
-                text = user.username ?: user.email ?: "Unknown User",
-                style = MaterialTheme.typography.bodyMedium
-            )
             
-            if (isCreator) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp)
+            ) {
                 Text(
-                    text = "Creator",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    text = user.username ?: user.email ?: "Unknown User",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                
+                if (isCreator) {
+                    Text(
+                        text = "Creator",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
@@ -425,16 +450,18 @@ fun MemberItem(user: User, isCreator: Boolean) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SnapItem(snap: Snap, onClick: () -> Unit) {
-    Card(
+    Surface(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        onClick = onClick
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Sender and time
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -442,42 +469,45 @@ fun SnapItem(snap: Snap, onClick: () -> Unit) {
             ) {
                 Text(
                     text = snap.senderName ?: "Unknown",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 
                 val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
                 Text(
                     text = formatter.format(snap.createdAt.toDate()),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
-            // Caption if available
             if (!snap.caption.isNullOrEmpty()) {
                 Text(
                     text = snap.caption,
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
             
-            // Preview indicator
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Image,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
                 )
                 
                 Text(
                     text = "Tap to view",
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 8.dp)
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
