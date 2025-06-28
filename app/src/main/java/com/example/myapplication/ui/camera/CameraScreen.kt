@@ -3,6 +3,7 @@ package com.example.myapplication.ui.camera
 import android.Manifest
 import android.net.Uri
 import android.util.Log
+import android.view.SurfaceView
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -24,16 +25,16 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.myapplication.data.repositories.SnapRepository
-import com.example.myapplication.ui.camera.filters.ARFilter
-import com.example.myapplication.ui.camera.filters.ARFilterManager
-import com.example.myapplication.ui.camera.filters.FilterSelector
+import com.example.myapplication.ui.camera.filters.DeepARFilter
+import com.example.myapplication.ui.camera.filters.DeepARManager
+import com.example.myapplication.ui.camera.filters.FilterCarousel
 import com.example.myapplication.ui.theme.ScreenshotProtection
 import com.google.accompanist.permissions.*
-import io.github.sceneview.ar.ArSceneView
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -61,16 +62,26 @@ fun CameraScreen(
     var isUploading by remember { mutableStateOf(false) }
     var isArMode by remember { mutableStateOf(false) }
     var showFilterSelector by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf<ARFilter?>(null) }
+    var selectedFilter by remember { mutableStateOf<DeepARFilter?>(null) }
     var captionText by remember { mutableStateOf("") }
     var showCaptionDialog by remember { mutableStateOf(false) }
     
-    // AR state
-    val arSceneView = remember { ArSceneView(context) }
-    val arFilterManager = remember { ARFilterManager(context, arSceneView, scope) }
+    // Create SurfaceView for DeepAR
+    val surfaceView = remember { SurfaceView(context) }
+    
+    // Create DeepAR manager
+    val deepARManager = remember { DeepARManager(context, scope, surfaceView) }
     
     // Available filters
-    val availableFilters by remember { mutableStateOf(arFilterManager.getAvailableFilters()) }
+    val availableFilters by remember { mutableStateOf(deepARManager.getAvailableFilters()) }
+    
+    // Cleanup when leaving the screen
+    DisposableEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.addObserver(deepARManager)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(deepARManager)
+        }
+    }
 
     // Request camera permission
     if (!hasPermission) {
@@ -172,18 +183,11 @@ fun CameraScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         // Camera preview or AR view
         if (isArMode) {
-            // AR view - in a real implementation, this would show AR content
-            // For now, we'll just show a placeholder Box
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = selectedFilter?.name ?: "AR Mode (No Filter Selected)",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            // DeepAR view
+            AndroidView(
+                factory = { surfaceView },
+                modifier = Modifier.fillMaxSize()
+            )
         } else {
             // Regular camera preview
             val previewView = remember { PreviewView(context) }
@@ -277,11 +281,15 @@ fun CameraScreen(
         FloatingActionButton(
             onClick = {
                 if (isArMode) {
-                    // Take AR screenshot
+                    // Take screenshot using DeepAR
+                    deepARManager.takeScreenshot()
+                    
+                    // Wait a moment for the screenshot to be processed
                     scope.launch {
-                        val uri = arFilterManager.takeScreenshot()
+                        delay(500) // Wait for screenshot to be processed
+                        val uri = deepARManager.getLastScreenshotUri()
                         if (uri != null) {
-                            Toast.makeText(context, "AR photo captured", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
                             capturedImageUri = uri
                             
                             if (circleId != null) {
@@ -290,7 +298,7 @@ fun CameraScreen(
                                 showRecipientSelector = true
                             }
                         } else {
-                            Toast.makeText(context, "AR capture failed", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
@@ -340,7 +348,7 @@ fun CameraScreen(
             )
         }
 
-        // Filter selector
+        // Filter carousel
         AnimatedVisibility(
             visible = showFilterSelector,
             modifier = Modifier
@@ -349,18 +357,12 @@ fun CameraScreen(
             enter = slideInVertically { it },
             exit = slideOutVertically { it }
         ) {
-            FilterSelector(
+            FilterCarousel(
                 filters = availableFilters,
                 selectedFilter = selectedFilter,
                 onFilterSelected = { filter ->
                     selectedFilter = filter
-                    arFilterManager.applyFilter(filter)
-                    showFilterSelector = false
-                },
-                onClearFilter = {
-                    selectedFilter = null
-                    arFilterManager.clearFilter()
-                    showFilterSelector = false
+                    deepARManager.applyFilter(filter)
                 }
             )
         }
