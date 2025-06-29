@@ -92,17 +92,17 @@ fun OSMMapComponent(
                     try {
                         Log.d(TAG, "Setting up tile source...")
                         val customTileSource = XYTileSource(
-                            "OpenStreetMap",
+                            "CartoPositron", // Name of the tile source
                             0, // min zoom
                             20, // max zoom
-                            256,
-                            ".png",
+                            256, // tile size
+                            ".png", // file extension
                             arrayOf(
-                                "https://a.tile.openstreetmap.org/",
-                                "https://b.tile.openstreetmap.org/",
-                                "https://c.tile.openstreetmap.org/"
+                                "https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/",
+                                "https://cartodb-basemaps-b.global.ssl.fastly.net/light_all/",
+                                "https://cartodb-basemaps-c.global.ssl.fastly.net/light_all/"
                             ),
-                            "© OpenStreetMap contributors"
+                            "© OpenStreetMap contributors, © CARTO"
                         )
                         map.setTileSource(customTileSource)
                         Log.d(TAG, "Tile source set successfully")
@@ -297,78 +297,3 @@ private fun updateMapMarkers(
         mapView.invalidate()
     }
 }
-
-// Extension function to get circle ID from marker
-private fun CircleMarker.getCircleId(): String = this.circle.id
-
-// Extension function to update marker selected state
-private fun CircleMarker.updateSelectedState(isSelected: Boolean) {
-    // Implementation depends on your CircleMarker class
-    // You'll need to add this functionality to CircleMarker
-}
-
-/**
- * Add circle markers to the map
- */
-private fun addCircleMarkers(
-    mapView: MapView,
-    circles: List<Circle>,
-    selectedCircle: Circle?,
-    onCircleClick: (Circle) -> Unit,
-    onCircleSelected: (Circle) -> Unit
-) {    
-    Log.d(TAG, "Adding ${circles.size} markers to map")
-    
-    // Clear existing markers
-    val overlaysToKeep = mapView.overlays.filterNot { it is CircleMarker }
-    val markersRemoved = mapView.overlays.size - overlaysToKeep.size
-    Log.d(TAG, "Cleared $markersRemoved existing markers")
-    
-    mapView.overlays.clear()
-    mapView.overlays.addAll(overlaysToKeep)
-    
-    // Add markers for each circle
-    var validMarkersAdded = 0
-    var invalidLocations = 0
-    
-    circles.forEach { circle ->
-        if (circle.locationLat != null && circle.locationLng != null) {
-            val marker = CircleMarker(
-                osmMapView = mapView,
-                circle = circle,
-                isSelected = circle == selectedCircle
-            ).apply {
-                // Make markers more visible
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                isDraggable = false
-                isFlat = true
-            }
-            
-            marker.setOnMarkerClickListener { _, _ ->
-                Log.d(TAG, "Marker clicked for circle: ${circle.name}")
-                onCircleSelected(circle)
-                onCircleClick(circle)
-                true
-            }
-            
-            mapView.overlays.add(marker)
-            validMarkersAdded++
-            Log.d(TAG, "Added marker for circle: ${circle.name} at (${circle.locationLat}, ${circle.locationLng})")
-        } else {
-            invalidLocations++
-            Log.w(TAG, "Circle ${circle.name} has invalid location")
-        }
-    }
-    
-    Log.d(TAG, "Added $validMarkersAdded valid markers, $invalidLocations circles had invalid locations")
-    
-    // Refresh the map
-    mapView.invalidate()
-}
-
-/**
- * Extension function to set map center
- */
-private fun MapView.setMapCenter(lat: Double, lng: Double) {
-    controller.setCenter(GeoPoint(lat, lng))
-} 
