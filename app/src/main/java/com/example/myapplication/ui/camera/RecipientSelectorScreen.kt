@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun RecipientSelectorScreen(
     onBack: () -> Unit,
-    onSendToRecipients: (List<String>) -> Unit
+    onSendToRecipients: (List<String>, List<String>) -> Unit
 ) {
     // Apply screenshot protection
     ScreenshotProtection()
@@ -40,17 +40,26 @@ fun RecipientSelectorScreen(
     val coroutineScope = rememberCoroutineScope()
     
     var friends by remember { mutableStateOf<List<User>>(emptyList()) }
+    var circles by remember { mutableStateOf<List<com.example.myapplication.data.models.Circle>>(emptyList()) }
     var selectedFriends by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedCircles by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var isSending by remember { mutableStateOf(false) }
     
-    // Load friends on first composition
+    // Load friends and circles on first composition
+    val circleRepository = remember { com.example.myapplication.data.repositories.CircleRepository() }
     LaunchedEffect(Unit) {
-        val result = friendRepository.getFriends()
+        val friendResult = friendRepository.getFriends()
+        val circleResult = circleRepository.getUserCircles()
         isLoading = false
-        result.fold(
+        friendResult.fold(
             onSuccess = { friendsList -> friends = friendsList },
             onFailure = { e -> error = e.message }
+        )
+        circleResult.fold(
+            onSuccess = { circleList -> circles = circleList },
+            onFailure = { e -> error = e.message ?: error }
         )
     }
     
@@ -64,19 +73,34 @@ fun RecipientSelectorScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { onSendToRecipients(selectedFriends.toList()) },
-                        enabled = selectedFriends.isNotEmpty()
-                    ) {
-                        Icon(
-                            Icons.Default.Send,
-                            contentDescription = "Send",
-                            tint = if (selectedFriends.isNotEmpty()) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            }
+                    val hasSelection = selectedFriends.isNotEmpty() || selectedCircles.isNotEmpty()
+
+                    if (isSending) {
+                        // Show small progress indicator while sending
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(end = 16.dp)
+                                .size(24.dp),
+                            strokeWidth = 2.dp
                         )
+                    } else {
+                        IconButton(
+                            onClick = {
+                                isSending = true
+                                onSendToRecipients(selectedFriends.toList(), selectedCircles.toList())
+                            },
+                            enabled = hasSelection
+                        ) {
+                            Icon(
+                                Icons.Default.Send,
+                                contentDescription = "Send",
+                                tint = if (hasSelection) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -129,33 +153,71 @@ fun RecipientSelectorScreen(
             } else {
                 Column {
                     // Selected count
-                    if (selectedFriends.isNotEmpty()) {
+                    val totalSelected = selectedFriends.size + selectedCircles.size
+                    if (totalSelected > 0) {
                         Text(
-                            text = "${selectedFriends.size} selected",
+                            text = "$totalSelected selected",
                             modifier = Modifier.padding(16.dp),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                     
-                    // Friends list
+                    // Friends and circles list
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(friends) { friend ->
-                            FriendSelectionItem(
-                                friend = friend,
-                                isSelected = selectedFriends.contains(friend.id),
-                                onToggleSelection = {
-                                    selectedFriends = if (selectedFriends.contains(friend.id)) {
-                                        selectedFriends - friend.id
-                                    } else {
-                                        selectedFriends + friend.id
+                        // Friends section
+                        if (friends.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Friends",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                            items(friends) { friend ->
+                                FriendSelectionItem(
+                                    friend = friend,
+                                    isSelected = selectedFriends.contains(friend.id),
+                                    onToggleSelection = {
+                                        selectedFriends = if (selectedFriends.contains(friend.id)) {
+                                            selectedFriends - friend.id
+                                        } else {
+                                            selectedFriends + friend.id
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
+                        }
+
+                        // Circles section
+                        if (circles.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Circles",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                            items(circles) { circle ->
+                                CircleSelectionItem(
+                                    circle = circle,
+                                    isSelected = selectedCircles.contains(circle.id),
+                                    onToggleSelection = {
+                                        selectedCircles = if (selectedCircles.contains(circle.id)) {
+                                            selectedCircles - circle.id
+                                        } else {
+                                            selectedCircles + circle.id
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -221,6 +283,78 @@ fun FriendSelectionItem(
                 )
             }
             
+            if (isSelected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CircleSelectionItem(
+    circle: com.example.myapplication.data.models.Circle,
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggleSelection),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar placeholder (first letter of circle name)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = circle.name.firstOrNull()?.toString() ?: "?",
+                    color = MaterialTheme.colorScheme.onSecondary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = circle.name,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (!circle.description.isNullOrEmpty()) {
+                    Text(
+                        text = circle.description ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
             if (isSelected) {
                 Icon(
                     Icons.Default.Check,

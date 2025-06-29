@@ -246,20 +246,34 @@ fun CameraScreen(
     var recordingDuration by remember { mutableStateOf(0L) }
     var recordingTimer by remember { mutableStateOf<Job?>(null) }
 
+    // Add AR recording state
+    var isArRecording by remember { mutableStateOf(false) }
+    var arRecordingDuration by remember { mutableStateOf(0L) }
+    var arRecordingTimer by remember { mutableStateOf<Job?>(null) }
+
     // Cleanup timer on dispose
     DisposableEffect(Unit) {
         onDispose {
             recordingTimer?.cancel()
             recordingTimer = null
+            arRecordingTimer?.cancel()
+            if (isArRecording) {
+                deepARManager.stopVideoRecording()
+            }
+            if (isRecording) {
+                recording?.stop()
+            }
         }
     }
 
     // Modify the media capture callback
-    val onMediaCaptured: (Uri, Boolean) -> Unit = { uri, isVideo ->
+    val onMediaCaptured: (Uri, Boolean) -> Unit = media@{ uri, isVideo ->
+        if (showReviewScreen) return@media // already showing, ignore duplicate
         capturedImageUri = uri
         isLastCaptureVideo = isVideo
-        showReviewScreen = true
         isCapturing = false  // Reset capturing state
+        if (isArMode) deepARManager.stopCamera() // pause AR feed during review
+        showReviewScreen = true
     }
 
     // Function to start/stop video recording
@@ -345,6 +359,50 @@ fun CameraScreen(
                 } catch (e: Exception) {
                     Log.e("CameraScreen", "Failed to start recording", e)
                     Toast.makeText(context, "Failed to start recording: ${e.message}", Toast.LENGTH_SHORT).show()
+                    isCapturing = false
+                }
+            }
+        }
+    }
+
+    // Function to start/stop AR video recording
+    val toggleArRecording = remember(deepARManager) {
+        {
+            if (isArRecording) {
+                // Stop AR recording
+                Log.d("CameraScreen", "Stopping AR video recording")
+                deepARManager.stopVideoRecording()
+                // Retrieve the recorded video URI and open review screen
+                deepARManager.getLastRecordedVideoUri()?.let { uri ->
+                    onMediaCaptured(uri, true)
+                }
+                arRecordingTimer?.cancel()
+                arRecordingTimer = null
+                arRecordingDuration = 0L
+                isArRecording = false
+            } else {
+                // Start AR recording
+                Log.d("CameraScreen", "Starting AR video recording")
+                isCapturing = true
+                
+                val name = SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US)
+                    .format(System.currentTimeMillis())
+                
+                try {
+                    // Create output file in app's private directory
+                    val outputFile = File(context.getExternalFilesDir(null), "$name.mp4")
+                    deepARManager.startVideoRecording(outputFile.absolutePath)
+                    isArRecording = true
+                    // Start timer
+                    arRecordingTimer = scope.launch {
+                        while (true) {
+                            delay(1000)
+                            arRecordingDuration += 1
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("CameraScreen", "Failed to start AR recording", e)
+                    Toast.makeText(context, "Failed to start AR recording: ${e.message}", Toast.LENGTH_SHORT).show()
                     isCapturing = false
                 }
             }
@@ -504,19 +562,6 @@ fun CameraScreen(
         }
     }
 
-    // Cleanup
-    DisposableEffect(lifecycleOwner) {
-        onDispose {
-            try {
-                cameraProvider?.unbindAll()
-                recording?.close()
-                deepARManager.stopCamera()
-            } catch (e: Exception) {
-                Log.e("CameraScreen", "Error cleaning up camera", e)
-            }
-        }
-    }
-
     if (!hasPermission) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -634,31 +679,7 @@ fun CameraScreen(
         }
     }
 
-    if (showRecipientSelector && capturedImageUri != null && circleId == null) {
-        RecipientSelectorScreen(
-            onBack = { showRecipientSelector = false },
-            onSendToRecipients = { recipients ->
-                isUploading = true
-                scope.launch {
-                    val result = snapRepo.uploadSnap(
-                        capturedImageUri!!, 
-                        recipients,
-                        context = context // Pass context for RAG
-                    )
-                    isUploading = false
-                    result.fold(
-                        onSuccess = { 
-                            Toast.makeText(context, "Snap sent!", Toast.LENGTH_SHORT).show()
-                            onSnapCaptured(capturedImageUri)
-                        },
-                        onFailure = { e ->
-                            Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                }
-            }
-        )
-    }
+    // Recipient selector will overlay other content, so place it at end for higher z-order
 
     // Show review screen if we have captured media
     if (showReviewScreen && capturedImageUri != null) {
@@ -666,16 +687,29 @@ fun CameraScreen(
             uri = capturedImageUri!!,
             isVideo = isLastCaptureVideo,
             onConfirm = {
+                // Close the review screen first
                 showReviewScreen = false
-                if (circleId != null) {
-                    showCaptionDialog = true
-                } else {
+
+                // Determine next step based on capture context
+                if (circleId == null) {
+                    // Regular snap – open recipient selector (friends & circles)
                     showRecipientSelector = true
+                } else {
+                    // Circle-specific snap – open caption dialog
+                    showCaptionDialog = true
+                }
+
+                // Resume AR feed if it was active (needed for selector/caption screens)
+                if (isArMode) {
+                    deepARManager.startCamera(lifecycleOwner)
                 }
             },
             onCancel = {
                 showReviewScreen = false
                 capturedImageUri = null
+                if (isArMode) {
+                    deepARManager.startCamera(lifecycleOwner)
+                }
             }
         )
     } else {
@@ -698,8 +732,8 @@ fun CameraScreen(
                 )
             }
 
-            // Recording indicator
-            if (isRecording) {
+            // Recording indicator for both regular and AR recording
+            if (isRecording || isArRecording) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -712,7 +746,6 @@ fun CameraScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Pulsating recording indicator
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -726,17 +759,16 @@ fun CameraScreen(
                                     )
                             )
                             Text(
-                                "Recording",
+                                if (isArRecording) "Recording AR" else "Recording",
                                 color = MaterialTheme.colorScheme.onError
                             )
                         }
                         
-                        // Recording duration
                         Text(
                             String.format(
                                 "%02d:%02d",
-                                recordingDuration / 60,
-                                recordingDuration % 60
+                                (if (isArRecording) arRecordingDuration else recordingDuration) / 60,
+                                (if (isArRecording) arRecordingDuration else recordingDuration) % 60
                             ),
                             color = MaterialTheme.colorScheme.onError
                         )
@@ -751,20 +783,22 @@ fun CameraScreen(
                     .padding(end = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Mode selector button
-                FloatingActionButton(
-                    onClick = { 
-                        if (!isRecording) { // Don't allow mode change during recording
-                            isVideoMode = !isVideoMode 
-                        }
-                    },
-                    modifier = Modifier.size(48.dp),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                ) {
-                    Icon(
-                        if (isVideoMode) Icons.Default.PhotoCamera else Icons.Default.Videocam,
-                        contentDescription = if (isVideoMode) "Switch to Photo Mode" else "Switch to Video Mode"
-                    )
+                // Mode selector button (hidden in AR mode)
+                if (!isArMode) {
+                    FloatingActionButton(
+                        onClick = { 
+                            if (!isRecording && !isArRecording) { // Don't allow mode change during recording
+                                isVideoMode = !isVideoMode 
+                            }
+                        },
+                        modifier = Modifier.size(48.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                    ) {
+                        Icon(
+                            if (isVideoMode) Icons.Default.PhotoCamera else Icons.Default.Videocam,
+                            contentDescription = if (isVideoMode) "Switch to Photo Mode" else "Switch to Video Mode"
+                        )
+                    }
                 }
                 
                 // Flash button
@@ -880,30 +914,21 @@ fun CameraScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 32.dp)
             ) {
-                // Record indicator
-                if (isRecording) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
-                                shape = CircleShape
-                            )
-                    )
-                }
-                
                 // Main capture button
                 FloatingActionButton(
                     onClick = { 
                         if (!showReviewScreen) {  // Only allow capture if not in review
                             if (isVideoMode) {
-                                toggleRecording()
+                                if (isArMode) {
+                                    toggleArRecording()
+                                } else {
+                                    toggleRecording()
+                                }
                             } else {
                                 // Photo mode
-                                if (!isRecording) {
-                                    isCapturing = true  // Set capturing state
+                                if (!isRecording && !isArRecording) {
+                                    isCapturing = true
                                     if (isArMode) {
-                                        // Take screenshot using DeepAR
                                         deepARManager.takeScreenshot()
                                         scope.launch {
                                             delay(500)
@@ -911,7 +936,7 @@ fun CameraScreen(
                                             if (uri != null) {
                                                 onMediaCaptured(uri, false)
                                             } else {
-                                                isCapturing = false  // Reset capturing state on error
+                                                isCapturing = false
                                                 Toast.makeText(context, "Failed to capture photo", Toast.LENGTH_SHORT).show()
                                             }
                                         }
@@ -966,19 +991,19 @@ fun CameraScreen(
                     },
                     modifier = Modifier.size(64.dp),
                     containerColor = when {
-                        isRecording -> MaterialTheme.colorScheme.error
+                        isArRecording || isRecording -> MaterialTheme.colorScheme.error
                         isVideoMode -> MaterialTheme.colorScheme.secondary
                         else -> MaterialTheme.colorScheme.primary
                     }
                 ) {
                     Icon(
                         when {
-                            isRecording -> Icons.Default.Stop
+                            isArRecording || isRecording -> Icons.Default.Stop
                             isVideoMode -> Icons.Default.Videocam
                             else -> Icons.Default.PhotoCamera
                         },
                         contentDescription = when {
-                            isRecording -> "Stop Recording"
+                            isArRecording || isRecording -> "Stop Recording"
                             isVideoMode -> "Start Recording"
                             else -> "Take Photo"
                         },
@@ -1016,6 +1041,51 @@ fun CameraScreen(
                 ) {
                     CircularProgressIndicator()
                 }
+            }
+
+            // --- Overlay: Recipient selector ---
+            if (showRecipientSelector && capturedImageUri != null && circleId == null) {
+                RecipientSelectorScreen(
+                    onBack = { showRecipientSelector = false },
+                    onSendToRecipients = { friendRecipients, circleRecipients ->
+                        isUploading = true
+                        scope.launch {
+                            var hasError = false
+
+                            // Send to selected friends (direct snaps)
+                            if (friendRecipients.isNotEmpty()) {
+                                val result = snapRepo.uploadSnap(
+                                    capturedImageUri!!,
+                                    friendRecipients,
+                                    context = context
+                                )
+                                if (result.isFailure) hasError = true
+                            }
+
+                            // Send to each selected Circle
+                            if (circleRecipients.isNotEmpty()) {
+                                circleRecipients.forEach { cId ->
+                                    val res = snapRepo.uploadSnapToCircle(
+                                        capturedImageUri!!,
+                                        cId,
+                                        context = context
+                                    )
+                                    if (res.isFailure) hasError = true
+                                }
+                            }
+
+                            isUploading = false
+
+                            if (!hasError) {
+                                Toast.makeText(context, "Snap sent!", Toast.LENGTH_SHORT).show()
+                                onSnapCaptured(capturedImageUri)
+                                showRecipientSelector = false
+                            } else {
+                                Toast.makeText(context, "One or more uploads failed", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
             }
         }
     }

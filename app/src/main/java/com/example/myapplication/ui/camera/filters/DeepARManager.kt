@@ -77,6 +77,10 @@ class DeepARManager(
     private var screenshotBitmap: Bitmap? = null
     private var screenshotUri: Uri? = null
     
+    // Last recorded video file
+    private var recordedVideoFile: File? = null
+    private var recordedVideoUri: Uri? = null
+    
     init {
         Log.d(TAG, "Initializing DeepAR Manager")
         surfaceView.holder.addCallback(this)
@@ -312,6 +316,10 @@ class DeepARManager(
     
     override fun videoRecordingFinished() {
         Log.d(TAG, "Video recording finished")
+        // When recording finishes, ensure we have the latest URI
+        recordedVideoFile?.let {
+            recordedVideoUri = Uri.fromFile(it)
+        }
     }
     
     override fun videoRecordingFailed() {
@@ -376,4 +384,39 @@ class DeepARManager(
         deepAR = null
         super.onDestroy(owner)
     }
+    
+    /**
+     * Starts DeepAR video recording to the provided file path.
+     * The recording resolution will match the current surface size.
+     */
+    fun startVideoRecording(outputPath: String) {
+        try {
+            val width = surfaceView.width.takeIf { it > 0 } ?: 720
+            val height = surfaceView.height.takeIf { it > 0 } ?: 1280
+
+            Log.d(TAG, "Calling DeepAR.startVideoRecording -> path=$outputPath w=$width h=$height")
+            deepAR?.startVideoRecording(outputPath, width, height)
+            recordedVideoFile = File(outputPath)
+            recordedVideoUri = Uri.fromFile(recordedVideoFile)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting video recording", e)
+        }
+    }
+
+    /**
+     * Stops an ongoing DeepAR video recording.
+     */
+    fun stopVideoRecording() {
+        try {
+            Log.d(TAG, "Calling DeepAR.stopVideoRecording")
+            deepAR?.stopVideoRecording()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping video recording", e)
+        }
+    }
+
+    /**
+     * Returns the URI of the last recorded video if available
+     */
+    fun getLastRecordedVideoUri(): Uri? = recordedVideoUri
 }
