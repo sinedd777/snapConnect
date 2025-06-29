@@ -30,6 +30,9 @@ android {
             useSupportLibrary = true
         }
 
+        // Add OpenAI API key to BuildConfig
+        buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties.getProperty("OPENAI_API_KEY") ?: ""}\"")
+        
         localProperties.keys.forEach { key ->
             val keyStr = key.toString()
             if (!keyStr.contains(".")) {
@@ -112,6 +115,13 @@ File(project.projectDir, "google-services.json").writeText(googleServicesJson)
 dependencies {
     implementation("com.composables:core:1.36.1")
     implementation("ai.deepar.ar:DeepAR:5.6.19")
+    
+    // RAG Dependencies
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
     implementation("androidx.camera:camera-camera2:1.3.1")
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")

@@ -35,6 +35,9 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import com.google.firebase.auth.FirebaseAuth
+import com.example.myapplication.data.repositories.RAGRepository
+import com.example.myapplication.data.models.Snap
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -65,6 +68,8 @@ fun CameraScreen(
     var selectedFilter by remember { mutableStateOf<DeepARFilter?>(null) }
     var captionText by remember { mutableStateOf("") }
     var showCaptionDialog by remember { mutableStateOf(false) }
+    var isGeneratingCaption by remember { mutableStateOf(false) }
+    var ragGeneratedCaption by remember { mutableStateOf<String?>(null) }
     
     // Create SurfaceView for DeepAR
     val surfaceView = remember { SurfaceView(context) }
@@ -142,12 +147,44 @@ fun CameraScreen(
             onDismissRequest = { showCaptionDialog = false },
             title = { Text("Add a caption") },
             text = {
-                OutlinedTextField(
-                    value = captionText,
-                    onValueChange = { captionText = it },
-                    label = { Text("Caption (optional)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column {
+                    OutlinedTextField(
+                        value = captionText,
+                        onValueChange = { captionText = it },
+                        label = { Text("Your caption (optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    if (isGeneratingCaption) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        )
+                        Text(
+                            "Generating AI caption...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    } else if (ragGeneratedCaption != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "✨ AI Suggested Caption:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            ragGeneratedCaption!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                        TextButton(
+                            onClick = { captionText = ragGeneratedCaption!! }
+                        ) {
+                            Text("Use AI Caption")
+                        }
+                    }
+                }
             },
             confirmButton = {
                 Button(
@@ -158,7 +195,8 @@ fun CameraScreen(
                             val result = snapRepo.uploadSnapToCircle(
                                 capturedImageUri!!,
                                 circleId,
-                                if (captionText.isBlank()) null else captionText
+                                if (captionText.isBlank()) null else captionText,
+                                context // Pass context for RAG
                             )
                             isUploading = false
                             result.fold(
@@ -184,6 +222,30 @@ fun CameraScreen(
                 }
             }
         )
+        
+        // Generate RAG caption when dialog opens
+        LaunchedEffect(Unit) {
+            isGeneratingCaption = true
+            val ragRepo = RAGRepository()
+            val dummySnap = Snap(
+                id = UUID.randomUUID().toString(),
+                sender = FirebaseAuth.getInstance().currentUser?.uid ?: "",
+                mediaUrl = capturedImageUri.toString(),
+                mediaType = "image/jpeg",
+                recipients = listOf(),
+                createdAt = com.google.firebase.Timestamp.now()
+            )
+            
+            ragRepo.generateAndStoreSnapCaption(dummySnap, capturedImageUri!!, context)
+                .onSuccess { caption ->
+                    ragGeneratedCaption = caption
+                }
+                .onFailure { e ->
+                    Log.e("CameraScreen", "Failed to generate RAG caption: ${e.message}")
+                }
+            
+            isGeneratingCaption = false
+        }
     }
 
     if (showRecipientSelector && capturedImageUri != null && circleId == null) {
@@ -192,7 +254,11 @@ fun CameraScreen(
             onSendToRecipients = { recipients ->
                 isUploading = true
                 scope.launch {
-                    val result = snapRepo.uploadSnap(capturedImageUri!!, recipients)
+                    val result = snapRepo.uploadSnap(
+                        capturedImageUri!!, 
+                        recipients,
+                        context = context // Pass context for RAG
+                    )
                     isUploading = false
                     result.fold(
                         onSuccess = { 
@@ -201,13 +267,11 @@ fun CameraScreen(
                         },
                         onFailure = { e ->
                             Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                            showRecipientSelector = false
                         }
                     )
                 }
             }
         )
-        return
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

@@ -7,9 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.models.Circle
+import com.example.myapplication.data.models.CircleSummary
 import com.example.myapplication.data.models.Snap
 import com.example.myapplication.data.models.User
 import com.example.myapplication.data.repositories.CircleRepository
+import com.example.myapplication.data.repositories.RAGRepository
 import com.example.myapplication.data.repositories.SnapRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -19,6 +21,7 @@ import kotlinx.coroutines.tasks.await
 class CircleDetailViewModel : ViewModel() {
     private val circleRepository = CircleRepository()
     private val snapRepository = SnapRepository()
+    private val ragRepository = RAGRepository()
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     
@@ -39,6 +42,9 @@ class CircleDetailViewModel : ViewModel() {
         
     var navigateBack by mutableStateOf(false)
         private set
+
+    var isGeneratingSummary by mutableStateOf(false)
+        private set
         
     val isCreator: Boolean
         get() = circle?.creatorId == auth.currentUser?.uid
@@ -58,6 +64,11 @@ class CircleDetailViewModel : ViewModel() {
                     
                     // Load member details
                     loadMembers()
+                    
+                    // Automatically generate summary if needed
+                    if (circle?.ragSummary == null || circle?.ragSummaryGeneratedAt == null) {
+                        generateCircleSummary()
+                    }
                 } else {
                     errorMessage = circleResult.exceptionOrNull()?.message ?: "Failed to load circle"
                 }
@@ -322,6 +333,28 @@ class CircleDetailViewModel : ViewModel() {
     
     fun clearError() {
         errorMessage = null
+    }
+
+    // Function to generate circle summary
+    fun generateCircleSummary() {
+        if (circle == null) return
+        
+        viewModelScope.launch {
+            isGeneratingSummary = true
+            try {
+                val result = ragRepository.generateAndStoreCircleSummary(circle!!.id)
+                if (result.isSuccess) {
+                    // Refresh circle data to get updated summary
+                    loadCircleDetails(circle!!.id)
+                } else {
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to generate summary"
+                }
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "An unknown error occurred"
+            } finally {
+                isGeneratingSummary = false
+            }
+        }
     }
 }
 

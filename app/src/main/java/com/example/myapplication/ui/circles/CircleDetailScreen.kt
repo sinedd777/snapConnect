@@ -197,15 +197,13 @@ fun CircleDetailScreen(
                             )
                         }
                         
-                        // Location info
-                        if (viewModel.circle?.locationEnabled == true) {
-                            item(key = "location_info") {
-                                LocationInfoSection(
-                                    latitude = viewModel.circle?.locationLat,
-                                    longitude = viewModel.circle?.locationLng,
-                                    radius = viewModel.circle?.locationRadius
-                                )
-                            }
+                        // Circle summary (new)
+                        item(key = "circle_summary") {
+                            CircleSummarySection(
+                                circle = viewModel.circle!!,
+                                isGeneratingSummary = viewModel.isGeneratingSummary,
+                                onGenerateSummary = { viewModel.generateCircleSummary() }
+                            )
                         }
                         
                         // Members section
@@ -390,41 +388,104 @@ fun CircleInfoSection(circle: Circle, memberCount: Int) {
 }
 
 @Composable
-fun LocationInfoSection(latitude: Double?, longitude: Double?, radius: Double?) {
-    if (latitude != null && longitude != null && radius != null) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 1.dp
+fun CircleSummarySection(
+    circle: Circle,
+    isGeneratingSummary: Boolean,
+    onGenerateSummary: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+            Text(
+                text = "Circle Summary",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            if (isGeneratingSummary) {
                 Row(
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Location-Based Circle",
+                        text = "Generating summary...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else if (circle.ragSummary != null) {
+                Text(
+                    text = circle.ragSummary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                if (circle.ragHighlights.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Highlights",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    circle.ragHighlights.forEach { highlight ->
+                        Row(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "•",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = highlight,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "Content is only visible within ${radius.toInt()} meters of the circle location.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (circle.ragSummaryGeneratedAt != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Last updated: ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(circle.ragSummaryGeneratedAt.toDate())}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "No summary yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = onGenerateSummary) {
+                        Text("Generate Summary")
+                    }
+                }
             }
         }
     }

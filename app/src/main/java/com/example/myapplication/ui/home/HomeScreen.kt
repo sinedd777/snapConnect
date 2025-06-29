@@ -256,15 +256,15 @@ fun HomeScreen(
                     )
                     NavigationBarItem(
                         selected = false,
-                        onClick = onOpenCircles,
-                        icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
-                        label = { Text("Circles") }
-                    )
-                    NavigationBarItem(
-                        selected = false,
                         onClick = onOpenCamera,
                         icon = { Icon(Icons.Default.AddCircle, contentDescription = "Create") },
                         label = { Text("Create") }
+                    )
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = onOpenCircles,
+                        icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
+                        label = { Text("Circles") }
                     )
                     NavigationBarItem(
                         selected = false,

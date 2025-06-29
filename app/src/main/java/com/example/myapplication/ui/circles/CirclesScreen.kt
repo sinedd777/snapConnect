@@ -101,7 +101,6 @@ fun CirclesScreen(
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
             ) {
                 NavigationBarItem(
                     selected = false,
@@ -110,16 +109,16 @@ fun CirclesScreen(
                     label = { Text("Home") }
                 )
                 NavigationBarItem(
-                    selected = true,
-                    onClick = { /* Already on circles */ },
-                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
-                    label = { Text("Circles") }
-                )
-                NavigationBarItem(
                     selected = false,
                     onClick = onOpenCamera,
                     icon = { Icon(Icons.Default.AddCircle, contentDescription = "Create") },
                     label = { Text("Create") }
+                )
+                NavigationBarItem(
+                    selected = true,
+                    onClick = { /* Already on circles */ },
+                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
+                    label = { Text("Circles") }
                 )
                 NavigationBarItem(
                     selected = false,

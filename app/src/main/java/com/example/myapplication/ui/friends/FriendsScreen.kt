@@ -154,18 +154,14 @@ fun FriendsScreen(
             )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ) {
                 NavigationBarItem(
                     selected = false,
                     onClick = onOpenHome,
                     icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                     label = { Text("Home") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onOpenCircles,
-                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
-                    label = { Text("Circles") }
                 )
                 NavigationBarItem(
                     selected = false,
@@ -175,6 +171,12 @@ fun FriendsScreen(
                 )
                 NavigationBarItem(
                     selected = true,
+                    onClick = onOpenCircles,
+                    icon = { Icon(Icons.Default.Groups, contentDescription = "Circles") },
+                    label = { Text("Circles") }
+                )
+                NavigationBarItem(
+                    selected = false,
                     onClick = { /* Already on friends */ },
                     icon = { Icon(Icons.Default.People, contentDescription = "Friends") },
                     label = { Text("Friends") }

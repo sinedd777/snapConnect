@@ -15,7 +15,12 @@ data class Snap(
     val viewedBy: List<String> = emptyList(),
     val screenshotBy: List<String> = emptyList(),
     val caption: String? = null,
-    val isCircleContent: Boolean = false
+    val isCircleContent: Boolean = false,
+    // RAG-related fields
+    val ragGeneratedCaption: String? = null,
+    val ragCaptionGenerated: Boolean = false,
+    val ragCaptionGeneratedAt: Timestamp? = null,
+    val ragTags: List<String> = emptyList()
 ) {
     val isViewed: Boolean
         get() = viewedBy.isNotEmpty()
@@ -60,7 +65,12 @@ data class Snap(
                 viewedBy = (map["viewedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                 screenshotBy = (map["screenshotBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                 caption = map["caption"] as? String,
-                isCircleContent = (map["isCircleContent"] as? Boolean) ?: false
+                isCircleContent = (map["isCircleContent"] as? Boolean) ?: false,
+                // RAG-related fields
+                ragGeneratedCaption = map["ragGeneratedCaption"] as? String,
+                ragCaptionGenerated = (map["ragCaptionGenerated"] as? Boolean) ?: false,
+                ragCaptionGeneratedAt = map["ragCaptionGeneratedAt"] as? Timestamp,
+                ragTags = (map["ragTags"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
             )
         }
     }

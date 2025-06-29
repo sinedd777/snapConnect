@@ -1,5 +1,6 @@
 package com.example.myapplication.data.repositories
 
+import android.content.Context
 import android.net.Uri
 import com.example.myapplication.data.models.Circle
 import com.example.myapplication.data.models.Snap
@@ -15,14 +16,16 @@ class SnapRepository {
     private val storage = Firebase.storage
     private val firestore = Firebase.firestore
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val ragRepository = RAGRepository()
 
     /**
-     * Upload a snap to be shared with specific recipients
+     * Upload a snap to be shared with specific recipients, with optional RAG caption generation
      */
     suspend fun uploadSnap(
         localUri: Uri, 
         recipients: List<String>? = null,
-        caption: String? = null
+        caption: String? = null,
+        context: Context? = null // Context needed for RAG caption generation
     ): Result<Uri> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("No user"))
@@ -52,10 +55,21 @@ class SnapRepository {
                 "isCircleContent" to false
             )
             
-            // Add caption if provided
+            // Add user-provided caption if provided
             caption?.let { data["caption"] = it }
             
-            firestore.collection("snaps").document(snapId).set(data).await()
+            // Create initial snap document
+            val snapDoc = firestore.collection("snaps").document(snapId)
+            snapDoc.set(data).await()
+            
+            // Generate RAG caption if context is provided
+            if (context != null) {
+                val snap = Snap.fromMap(data)
+                ragRepository.generateAndStoreSnapCaption(snap, localUri, context)
+                    .onFailure { e -> 
+                        println("Failed to generate RAG caption: ${e.message}")
+                    }
+            }
 
             Result.success(downloadUrl)
         } catch (e: Exception) {
@@ -64,12 +78,13 @@ class SnapRepository {
     }
     
     /**
-     * Upload a snap to a Circle
+     * Upload a snap to a Circle, with RAG caption generation
      */
     suspend fun uploadSnapToCircle(
         localUri: Uri, 
         circleId: String,
-        caption: String? = null
+        caption: String? = null,
+        context: Context? = null // Context needed for RAG caption generation
     ): Result<Uri> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("No user"))
@@ -104,10 +119,21 @@ class SnapRepository {
                 "isCircleContent" to true
             )
             
-            // Add caption if provided
+            // Add user-provided caption if provided
             caption?.let { data["caption"] = it }
             
-            firestore.collection("snaps").document(snapId).set(data).await()
+            // Create initial snap document
+            val snapDoc = firestore.collection("snaps").document(snapId)
+            snapDoc.set(data).await()
+            
+            // Generate RAG caption if context is provided
+            if (context != null) {
+                val snap = Snap.fromMap(data)
+                ragRepository.generateAndStoreSnapCaption(snap, localUri, context)
+                    .onFailure { e -> 
+                        println("Failed to generate RAG caption: ${e.message}")
+                    }
+            }
 
             Result.success(downloadUrl)
         } catch (e: Exception) {

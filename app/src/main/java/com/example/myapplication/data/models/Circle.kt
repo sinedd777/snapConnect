@@ -25,7 +25,13 @@ data class Circle(
     val category: String? = null,
     val arFilterId: String? = null,
     val collegeTown: String? = null,
-    val geohash: String? = null
+    val geohash: String? = null,
+    // RAG-related fields
+    val ragSummary: String? = null,
+    val ragHighlights: List<String> = emptyList(),
+    val ragTags: List<String> = emptyList(),
+    val ragSummaryGeneratedAt: Timestamp? = null,
+    val ragContentAnalysis: Map<String, Any> = emptyMap() // For storing additional RAG insights
 ) {
     companion object {
         fun fromMap(map: Map<String, Any>): Circle {
@@ -48,7 +54,13 @@ data class Circle(
                 category = map["category"] as? String,
                 arFilterId = map["arFilterId"] as? String,
                 collegeTown = map["collegeTown"] as? String,
-                geohash = map["geohash"] as? String
+                geohash = map["geohash"] as? String,
+                // RAG-related fields
+                ragSummary = map["ragSummary"] as? String,
+                ragHighlights = (map["ragHighlights"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                ragTags = (map["ragTags"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                ragSummaryGeneratedAt = map["ragSummaryGeneratedAt"] as? Timestamp,
+                ragContentAnalysis = (map["ragContentAnalysis"] as? Map<String, Any>) ?: emptyMap()
             )
         }
     }
