@@ -7,21 +7,27 @@ import android.view.SurfaceView
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.*
+import androidx.camera.video.VideoCapture
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import androidx.lifecycle.LifecycleOwner
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.myapplication.data.repositories.SnapRepository
@@ -30,8 +36,7 @@ import com.example.myapplication.ui.camera.filters.DeepARManager
 import com.example.myapplication.ui.camera.filters.FilterCarousel
 import com.example.myapplication.ui.theme.ScreenshotProtection
 import com.google.accompanist.permissions.*
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -53,23 +58,45 @@ fun CameraScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     
-    // Camera state
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    // Initialize repositories
     val snapRepo = remember { SnapRepository() }
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     
-    // UI state
+    // Camera state
     var hasPermission by rememberSaveable { mutableStateOf(false) }
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var showRecipientSelector by remember { mutableStateOf(false) }
     var isUploading by remember { mutableStateOf(false) }
     var isArMode by remember { mutableStateOf(false) }
-    var showFilterSelector by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<DeepARFilter?>(null) }
     var captionText by remember { mutableStateOf("") }
     var showCaptionDialog by remember { mutableStateOf(false) }
     var isGeneratingCaption by remember { mutableStateOf(false) }
     var ragGeneratedCaption by remember { mutableStateOf<String?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
+    var recordingStartTime by remember { mutableStateOf(0L) }
+    var isFlashEnabled by remember { mutableStateOf(false) }
+    var isBackCamera by remember { mutableStateOf(true) }
+    
+    // Camera setup
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
+    var videoCapture: VideoCapture<Recorder>? by remember { mutableStateOf(null) }
+    var recording: Recording? by remember { mutableStateOf(null) }
+    var camera: Camera? by remember { mutableStateOf(null) }
+    var cameraProvider: ProcessCameraProvider? by remember { mutableStateOf(null) }
+    
+    // Create and remember PreviewView
+    val previewView = remember { PreviewView(context).apply {
+        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+    }}
+    
+    // Remember Preview use case
+    val preview = remember { Preview.Builder()
+        .build()
+        .also {
+            it.setSurfaceProvider(previewView.surfaceProvider)
+        }
+    }
     
     // Create SurfaceView for DeepAR
     val surfaceView = remember { SurfaceView(context) }
@@ -79,54 +106,107 @@ fun CameraScreen(
     
     // Available filters
     val availableFilters by remember { mutableStateOf(deepARManager.getAvailableFilters()) }
-    
-    // Handle AR mode and filter application
-    LaunchedEffect(Unit) {
-        delay(500) // Short delay to ensure UI is ready
-        Log.d("CameraScreen", "Switching to AR mode")
-        isArMode = true
-        
-        // Start camera with lifecycle owner
-        deepARManager.startCamera(lifecycleOwner)
-        
-        // Apply a default filter after a short delay to ensure DeepAR is initialized
-        delay(1500)
-        if (availableFilters.isNotEmpty()) {
-            // Try a few different filters to see if any work
-            val filterOptions = listOf("Devil Horns", "Viking Helmet", "Makeup Look", "None")
-            val defaultFilter = filterOptions.firstNotNullOfOrNull { filterName ->
-                availableFilters.firstOrNull { it.name == filterName }
-            } ?: availableFilters.first()
-            
-            Log.d("CameraScreen", "Applying default filter: ${defaultFilter.name}")
-            selectedFilter = defaultFilter
-            deepARManager.applyFilter(defaultFilter)
-        }
-    }
-    
-    // Cleanup when leaving the screen
-    DisposableEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.addObserver(deepARManager)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(deepARManager)
+
+    // Request camera permission
+    val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
+    LaunchedEffect(cameraPermissionState.status) {
+        when (cameraPermissionState.status) {
+            is PermissionStatus.Granted -> {
+                hasPermission = true
+            }
+            is PermissionStatus.Denied -> {
+                cameraPermissionState.launchPermissionRequest()
+            }
         }
     }
 
-    // Request camera permission
-    if (!hasPermission) {
-        val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
-        
-        LaunchedEffect(key1 = cameraPermission.status) {
-            Log.d("CameraScreen", "Camera permission status: ${cameraPermission.status}")
-            if (cameraPermission.status == PermissionStatus.Granted) {
-                hasPermission = true
-                Log.d("CameraScreen", "Camera permission granted")
+    // Initialize camera when permission is granted
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            try {
+                cameraProvider = cameraProviderFuture.get()
                 
-                // Force AR mode immediately when permission is granted
-                isArMode = true
-            } else if (cameraPermission.status is PermissionStatus.Denied) {
-                Log.d("CameraScreen", "Requesting camera permission")
-                cameraPermission.launchPermissionRequest()
+                // Create use cases
+                imageCapture = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .build()
+                
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(QualitySelector.from(
+                        Quality.HIGHEST,
+                        FallbackStrategy.higherQualityOrLowerThan(Quality.SD)
+                    ))
+                    .build()
+                videoCapture = VideoCapture.withOutput(recorder)
+                
+                // Select back camera
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                
+                // Unbind all use cases before rebinding
+                cameraProvider?.unbindAll()
+                
+                if (!isArMode) {
+                    // Bind use cases
+                    camera = cameraProvider?.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageCapture!!,
+                        videoCapture!!
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("CameraScreen", "Camera initialization failed", e)
+            }
+        }
+    }
+
+    // Handle AR mode changes
+    LaunchedEffect(isArMode) {
+        if (isArMode) {
+            cameraProvider?.unbindAll()
+            delay(500)
+            deepARManager.startCamera(lifecycleOwner)
+            
+            delay(1500)
+            if (availableFilters.isNotEmpty()) {
+                val filterOptions = listOf("Devil Horns", "Viking Helmet", "Makeup Look", "None")
+                val defaultFilter = filterOptions.firstNotNullOfOrNull { filterName ->
+                    availableFilters.firstOrNull { it.name == filterName }
+                } ?: availableFilters.first()
+                
+                selectedFilter = defaultFilter
+                deepARManager.applyFilter(defaultFilter)
+            }
+        } else {
+            deepARManager.stopCamera()
+            
+            // Rebind regular camera
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            try {
+                cameraProvider?.unbindAll()
+                camera = cameraProvider?.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture!!,
+                    videoCapture!!
+                )
+            } catch (e: Exception) {
+                Log.e("CameraScreen", "Failed to bind camera use cases", e)
+            }
+        }
+    }
+
+    // Cleanup
+    DisposableEffect(lifecycleOwner) {
+        onDispose {
+            try {
+                cameraProvider?.unbindAll()
+                recording?.close()
+                deepARManager.stopCamera()
+            } catch (e: Exception) {
+                Log.e("CameraScreen", "Error cleaning up camera", e)
             }
         }
     }
@@ -275,77 +355,66 @@ fun CameraScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Camera preview or AR view
+        // Camera preview
         if (isArMode) {
-            // DeepAR view
             AndroidView(
                 factory = { surfaceView },
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            // Regular camera preview
-            val previewView = remember { PreviewView(context) }
             AndroidView(
                 factory = { previewView },
-                modifier = Modifier.fillMaxSize()
-            ) { view ->
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().apply {
-                    setSurfaceProvider(view.surfaceProvider)
+                modifier = Modifier.fillMaxSize(),
+                update = { view ->
+                    try {
+                        val cameraSelector = if (isBackCamera) {
+                            CameraSelector.DEFAULT_BACK_CAMERA
+                        } else {
+                            CameraSelector.DEFAULT_FRONT_CAMERA
+                        }
+                        
+                        cameraProvider?.unbindAll()
+                        camera = cameraProvider?.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            imageCapture ?: return@AndroidView,
+                            videoCapture ?: return@AndroidView
+                        )
+                    } catch (e: Exception) {
+                        Log.e("CameraScreen", "Use case binding failed", e)
+                    }
                 }
-                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-                try {
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture
-                    )
-                } catch (exc: Exception) {
-                    Log.e("CameraScreen", "Use case binding failed", exc)
-                }
-            }
+            )
         }
 
-        // Top action buttons
-        Row(
+        // Right side control buttons
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Close button
+            // Flash button
             FloatingActionButton(
-                onClick = onBack,
+                onClick = { 
+                    isFlashEnabled = !isFlashEnabled
+                    camera?.cameraControl?.enableTorch(isFlashEnabled)
+                },
                 modifier = Modifier.size(48.dp),
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close")
-            }
-            
-            // Circle mode indicator if applicable
-            if (circleId != null) {
-                FloatingActionButton(
-                    onClick = { /* No action needed */ },
-                    modifier = Modifier.size(48.dp),
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                ) {
-                    Icon(
-                        Icons.Default.Groups,
-                        contentDescription = "Circle Mode"
-                    )
-                }
+                Icon(
+                    if (isFlashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = if (isFlashEnabled) "Disable Flash" else "Enable Flash"
+                )
             }
             
             // Toggle AR mode button
             FloatingActionButton(
                 onClick = { 
                     isArMode = !isArMode
-                    // If switching to regular camera, clear any active filter
-                    if (!isArMode && selectedFilter != null) {
+                    if (!isArMode) {
                         selectedFilter = null
                     }
                 },
@@ -353,104 +422,266 @@ fun CameraScreen(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
             ) {
                 Icon(
-                    if (isArMode) Icons.Default.CameraAlt else Icons.Default.Face,
+                    if (isArMode) Icons.Default.ArrowBack else Icons.Default.Face,
                     contentDescription = if (isArMode) "Switch to Camera" else "Switch to AR"
                 )
             }
             
-            // Filter button (only in AR mode)
-            AnimatedVisibility(
-                visible = isArMode,
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally()
-            ) {
+            // Camera flip button
+            if(!isArMode){
                 FloatingActionButton(
-                    onClick = { showFilterSelector = !showFilterSelector },
-                    modifier = Modifier.size(48.dp),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                ) {
-                    Icon(
-                        Icons.Default.FilterVintage,
-                        contentDescription = "Filters"
-                    )
-                }
+                onClick = { 
+                    scope.launch {
+                        // Reset filters when switching to back camera
+                        if (!isBackCamera) {
+                            selectedFilter = null
+                            isArMode = false // Disable AR mode when switching to back camera
+                        }
+                        isBackCamera = !isBackCamera
+                        val newCameraSelector = if (isBackCamera) {
+                            CameraSelector.DEFAULT_BACK_CAMERA
+                        } else {
+                            CameraSelector.DEFAULT_FRONT_CAMERA
+                        }
+                        
+                        try {
+                            if (isArMode) {
+                                // For AR mode, we need to stop and restart the camera
+                                deepARManager.stopCamera()
+                                delay(500) // Give time for camera to release
+                                deepARManager.startCamera(lifecycleOwner)
+                            } else {
+                                cameraProvider?.unbindAll()
+                                camera = cameraProvider?.bindToLifecycle(
+                                    lifecycleOwner,
+                                    newCameraSelector,
+                                    preview,
+                                    imageCapture ?: return@launch,
+                                    videoCapture ?: return@launch
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e("CameraScreen", "Failed to flip camera", e)
+                            Toast.makeText(context, "Failed to flip camera", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                modifier = Modifier.size(48.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+            ) {
+                Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Flip Camera")
+            }}
+        }
+        
+        // Close button at top-left
+        FloatingActionButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(48.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Close")
+        }
+        
+        // Circle mode indicator if applicable
+        if (circleId != null) {
+            FloatingActionButton(
+                onClick = { /* No action needed */ },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .size(48.dp),
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            ) {
+                Icon(
+                    Icons.Default.Groups,
+                    contentDescription = "Circle Mode"
+                )
             }
         }
 
         // Capture button
-        FloatingActionButton(
-            onClick = {
-                if (isArMode) {
-                    // Take screenshot using DeepAR
-                    deepARManager.takeScreenshot()
-                    
-                    // Wait a moment for the screenshot to be processed
-                    scope.launch {
-                        delay(500) // Wait for screenshot to be processed
-                        val uri = deepARManager.getLastScreenshotUri()
-                        if (uri != null) {
-                            Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
-                            capturedImageUri = uri
-                            
-                            if (circleId != null) {
-                                showCaptionDialog = true
-                            } else {
-                                showRecipientSelector = true
-                            }
-                        } else {
-                            Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    // Take regular photo
-                    val photoFile = File(
-                        context.cacheDir,
-                        SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-                            .format(System.currentTimeMillis()) + ".jpg"
-                    )
-
-                    val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
-                    imageCapture.takePicture(
-                        outputOptions,
-                        ContextCompat.getMainExecutor(context),
-                        object : ImageCapture.OnImageSavedCallback {
-                            override fun onError(exception: ImageCaptureException) {
-                                Log.e("CameraScreen", "Photo capture failed: $exception")
-                                Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
-                                onSnapCaptured(null)
-                            }
-
-                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
-                                Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
-                                capturedImageUri = savedUri
-                                
-                                if (circleId != null) {
-                                    showCaptionDialog = true
-                                } else {
-                                    showRecipientSelector = true
-                                }
-                            }
-                        }
-                    )
-                }
-            },
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp),
-            containerColor = MaterialTheme.colorScheme.primary
+                .padding(bottom = 32.dp)
         ) {
-            Icon(
-                Icons.Default.Camera,
-                contentDescription = "Take Photo",
-                modifier = Modifier.size(32.dp)
-            )
+            // Record indicator
+            if (isRecording) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
+                            shape = CircleShape
+                        )
+                )
+            }
+            
+            // Main capture button
+            FloatingActionButton(
+                onClick = { },  // Handle in pointerInput
+                modifier = Modifier
+                    .size(64.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = { pressPosition ->
+                                val pressStartTime = System.currentTimeMillis()
+                                val job = scope.launch {
+                                    delay(1000) // Wait 1 second before starting video
+                                    if (isActive) {
+                                        // Start video recording
+                                        if (!isRecording) {
+                                            val name = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                                                .format(System.currentTimeMillis())
+                                            val contentValues = android.content.ContentValues().apply {
+                                                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                                                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                                            }
+                                            
+                                            val mediaStoreOutput = MediaStoreOutputOptions.Builder(
+                                                context.contentResolver,
+                                                android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                                            ).setContentValues(contentValues).build()
+
+                                            if (videoCapture == null) {
+                                                Toast.makeText(context, "Camera not ready yet", Toast.LENGTH_SHORT).show()
+                                                return@launch
+                                            }
+
+                                            recording = videoCapture?.output
+                                                ?.prepareRecording(context, mediaStoreOutput)
+                                                ?.apply { 
+                                                    if (PermissionChecker.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == 
+                                                        PermissionChecker.PERMISSION_GRANTED) {
+                                                        withAudioEnabled()
+                                                    }
+                                                }
+                                                ?.start(ContextCompat.getMainExecutor(context)) { event ->
+                                                    when(event) {
+                                                        is VideoRecordEvent.Start -> {
+                                                            isRecording = true
+                                                            recordingStartTime = System.currentTimeMillis()
+                                                        }
+                                                        is VideoRecordEvent.Finalize -> {
+                                                            if (!event.hasError()) {
+                                                                val uri = event.outputResults.outputUri
+                                                                Toast.makeText(context, "Video captured", Toast.LENGTH_SHORT).show()
+                                                                capturedImageUri = uri
+                                                                if (circleId != null) {
+                                                                    showCaptionDialog = true
+                                                                } else {
+                                                                    showRecipientSelector = true
+                                                                }
+                                                            } else {
+                                                                recording?.close()
+                                                                recording = null
+                                                                Toast.makeText(context, "Video capture failed: ${event.error}", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                            isRecording = false
+                                                        }
+                                                    }
+                                                }
+
+                                            if (recording == null) {
+                                                Toast.makeText(context, "Failed to prepare video recording", Toast.LENGTH_SHORT).show()
+                                                return@launch
+                                            }
+
+                                            // Start a timer to stop recording after 10 seconds
+                                            scope.launch {
+                                                delay(10000) // 10 seconds
+                                                if (isRecording) {
+                                                    recording?.stop()
+                                                    recording = null
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                tryAwaitRelease()
+                                job.cancel()
+                                
+                                // If it was a short press and we're not recording, take a photo
+                                if (!isRecording && System.currentTimeMillis() - pressStartTime < 1000) {
+                                    if (isArMode) {
+                                        // Take screenshot using DeepAR
+                                        deepARManager.takeScreenshot()
+                                        scope.launch {
+                                            delay(500)
+                                            val uri = deepARManager.getLastScreenshotUri()
+                                            if (uri != null) {
+                                                Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
+                                                capturedImageUri = uri
+                                                if (circleId != null) {
+                                                    showCaptionDialog = true
+                                                } else {
+                                                    showRecipientSelector = true
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // Take regular photo
+                                        val photoFile = File(
+                                            context.cacheDir,
+                                            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                                                .format(System.currentTimeMillis()) + ".jpg"
+                                        )
+                                        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                                        
+                                        if (imageCapture == null) {
+                                            Toast.makeText(context, "Camera not ready yet", Toast.LENGTH_SHORT).show()
+                                            return@detectTapGestures
+                                        }
+                                        
+                                        imageCapture?.takePicture(
+                                            outputOptions,
+                                            ContextCompat.getMainExecutor(context),
+                                            object : ImageCapture.OnImageSavedCallback {
+                                                override fun onError(exception: ImageCaptureException) {
+                                                    Log.e("CameraScreen", "Photo capture failed: $exception")
+                                                    Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
+                                                    onSnapCaptured(null)
+                                                }
+                                                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                                    val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
+                                                    Toast.makeText(context, "Photo captured", Toast.LENGTH_SHORT).show()
+                                                    capturedImageUri = savedUri
+                                                    if (circleId != null) {
+                                                        showCaptionDialog = true
+                                                    } else {
+                                                        showRecipientSelector = true
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                } else if (isRecording) {
+                                    // Stop video recording
+                                    recording?.stop()
+                                    recording = null
+                                }
+                            }
+                        )
+                    },
+                containerColor = if (isRecording) 
+                    MaterialTheme.colorScheme.error 
+                else MaterialTheme.colorScheme.primary
+            ) {
+                Icon(
+                    if (isRecording) Icons.Default.Stop else Icons.Default.Camera,
+                    contentDescription = if (isRecording) "Stop Recording" else "Take Photo",
+                    modifier = Modifier.size(32.dp)
+                )
+            }
         }
 
         // Filter carousel
         AnimatedVisibility(
-            visible = showFilterSelector,
+            visible = isArMode && !isBackCamera,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 100.dp),
