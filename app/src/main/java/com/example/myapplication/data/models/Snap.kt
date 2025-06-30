@@ -20,7 +20,8 @@ data class Snap(
     val ragGeneratedCaption: String? = null,
     val ragCaptionGenerated: Boolean = false,
     val ragCaptionGeneratedAt: Timestamp? = null,
-    val ragTags: List<String> = emptyList()
+    val ragTags: List<String> = emptyList(),
+    val imageAnalysis: ImageAnalysis? = null
 ) {
     val isViewed: Boolean
         get() = viewedBy.isNotEmpty()
@@ -52,6 +53,20 @@ data class Snap(
             // Convert recipients to List<String>, filtering out any non-string values
             val recipientsList = recipients.filterIsInstance<String>()
             
+            // Parse image analysis if it exists
+            val imageAnalysis = (map["imageAnalysis"] as? Map<String, Any>)?.let { analysisMap ->
+                ImageAnalysis(
+                    objects = (analysisMap["objects"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    scenes = (analysisMap["scenes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    actions = (analysisMap["actions"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    emotions = (analysisMap["emotions"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    dominantColors = (analysisMap["dominantColors"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    tags = (analysisMap["tags"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    confidence = (analysisMap["confidence"] as? Double) ?: 0.0,
+                    generatedAt = analysisMap["generatedAt"] as? Timestamp ?: Timestamp.now()
+                )
+            }
+            
             return Snap(
                 id = id,
                 sender = sender,
@@ -70,7 +85,8 @@ data class Snap(
                 ragGeneratedCaption = map["ragGeneratedCaption"] as? String,
                 ragCaptionGenerated = (map["ragCaptionGenerated"] as? Boolean) ?: false,
                 ragCaptionGeneratedAt = map["ragCaptionGeneratedAt"] as? Timestamp,
-                ragTags = (map["ragTags"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                ragTags = (map["ragTags"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                imageAnalysis = imageAnalysis
             )
         }
     }

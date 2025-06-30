@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Development Phase
-Pivoting from individual snap sharing to map-based, college-focused Circle platform. Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning to map-based interface with college town selection and RAG integration. UI enhanced with Material 3 design system. Map functionality with location services implemented, including fullscreen mode and circle display.
+Pivoting from individual snap sharing to map-based, college-focused Circle platform. Core functionality implemented with authentication, camera, friend management, and snap sharing. Firebase security rules configured, Firestore indexes deployed, and basic AR filter UI implemented. Transitioning to map-based interface with college town selection and RAG integration. UI enhanced with Material 3 design system. Map functionality with location services implemented, including fullscreen mode and circle display. Screenshot prevention implemented for sensitive content.
 
 ## Product Pivot
 We are pivoting the app to focus on:
@@ -36,6 +36,7 @@ We are pivoting the app to focus on:
    - Snap model
    - FriendRequest model
    - Circle model
+   - RAG-specific models (OpenAI integration)
 4. Configured Firebase security rules:
    - User document access control
    - Snap document permissions
@@ -51,6 +52,7 @@ We are pivoting the app to focus on:
    - Created filter selection UI
    - Added toggle between normal camera and AR mode
    - Set up simplified AR filter manager
+   - Added video recording support
 7. Enhanced UI with Material 3:
    - Implemented proper Material 3 theming
    - Added custom color schemes for light/dark modes
@@ -84,6 +86,18 @@ We are pivoting the app to focus on:
     - Integrated with map-based discovery
     - Made location enabled by default
     - Added permission handling during circle creation
+12. Implemented screenshot prevention:
+    - Added FLAG_SECURE to sensitive screens
+    - Created ScreenshotProtection composable
+    - Protected snap viewing screens
+    - Protected camera screens
+    - Protected recipient selection screens
+13. Added RAG integration:
+    - Created RAG-specific data models
+    - Implemented OpenAI service integration
+    - Added circle context analysis
+    - Implemented temporal pattern analysis
+    - Added engagement metrics tracking
 
 ## Active Focus Areas
 1. RAG integration for content enhancement
@@ -143,6 +157,8 @@ We are pivoting the app to focus on:
 8. ARCore/Sceneform library compatibility issues
 9. RAG integration complexity
 10. Real-time collaborative features implementation
+11. Screenshot prevention edge cases
+12. OpenAI API integration reliability
 
 ## Technical Decisions
 1. Using Jetpack Compose for UI
@@ -154,11 +170,12 @@ We are pivoting the app to focus on:
 7. ARCore and Sceneform for AR filters
 8. OpenStreetMap for map implementation
 9. Geofencing for location-based Circles
-10. RAG API integration (evaluating options)
+10. RAG API integration with OpenAI
 11. Material 3 for consistent design system
 12. OAuth providers for authentication
 13. Google Play Services for location updates
 14. Material 3 bottom sheets for circle information
+15. FLAG_SECURE for screenshot prevention
 
 ## Core Workflows
 1. Map Rendering and Circle Display:
@@ -187,6 +204,11 @@ We are pivoting the app to focus on:
    - Generate captions, hashtags, or filter suggestions
    - Cache results for 1 hour to reduce API calls
    - Deliver suggestions in <2 seconds
+5. Screenshot Prevention:
+   - Apply FLAG_SECURE to sensitive screens
+   - Hide content in recent apps
+   - Block screen recording
+   - Prevent secure display casting
 
 ## Testing Status
 1. Basic unit tests needed for auth flow
@@ -198,6 +220,7 @@ We are pivoting the app to focus on:
 7. AR functionality tests needed
 8. Circle functionality tests needed
 9. RAG integration tests needed
+10. Screenshot prevention tests needed
 
 ## Documentation Needs
 1. Map integration documentation
@@ -208,6 +231,8 @@ We are pivoting the app to focus on:
 6. UI component documentation
 7. Testing strategy documentation
 8. Material 3 theme customization guide
+9. Screenshot prevention implementation guide
+10. OpenAI integration guide
 
 ## Current Branch Structure
 ```

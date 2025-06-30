@@ -457,12 +457,20 @@ class CircleRepository {
             // Create a list to hold all query tasks
             val tasks = bounds.map { bound ->
                 firestore.collection(CIRCLES_COLLECTION)
-                    .whereEqualTo("private", false)
+                    .whereEqualTo("private", false)  // Only get public circles
                     .orderBy("geohash")
                     .startAt(bound.startHash)
                     .endAt(bound.endHash)
                     .get()
-            }
+            }.toMutableList()
+            
+            // Add an additional query for public circles without location
+            tasks.add(
+                firestore.collection(CIRCLES_COLLECTION)
+                    .whereEqualTo("private", false)
+                    .whereEqualTo("locationEnabled", false)
+                    .get()
+            )
             
             // Wait for all queries to complete
             val snapshots = tasks.map { it.await() }
@@ -481,35 +489,40 @@ class CircleRepository {
                 snapshot.documents.filter { doc ->
                     val lat = doc.getDouble("locationLat")
                     val lng = doc.getDouble("locationLng")
-                    
-                    if (lat == null || lng == null) {
-                        return@filter false
-                    }
-                    
-                    // We have to filter out a few false positives due to GeoHash accuracy
-                    val docLocation = GeoLocation(lat, lng)
-                    val distanceInM = GeoFireUtils.getDistanceBetween(docLocation, center)
-                    val isWithinRadius = distanceInM <= radiusInM
-                    
-                    isWithinRadius
+                    val locationEnabled = doc.getBoolean("locationEnabled") ?: true
+
+                    // Include the circle if:
+                    // 1. Location is not enabled (it's a public circle without location)
+                    // 2. OR if location is enabled and within radius
+                    !locationEnabled || (lat != null && lng != null && GeoFireUtils.getDistanceBetween(
+                        GeoLocation(lat, lng),
+                        center
+                    ) <= radiusInM)
                 }
-            }
-            
-            // Convert to Circle objects
+            }.distinctBy { it.id } // Remove any duplicates
+
+            // Convert to Circle objects and log for debugging
             val circles = matchingDocs.mapNotNull { doc ->
                 try {
-                    val data = doc.data
-                    if (data == null) {
-                        return@mapNotNull null
-                    }
-                    data["id"] = doc.id
-                    Circle.fromMap(data)
+                    val data = doc.data?.plus(mapOf("id" to doc.id)) ?: return@mapNotNull null
+                    val circle = Circle.fromMap(data)
+                    
+                    // Log circle details for debugging
+                    Log.d(TAG, """Processing circle:
+                        |ID: ${circle.id}
+                        |Name: ${circle.name}
+                        |Location enabled: ${circle.locationEnabled}
+                        |Location: (${circle.locationLat}, ${circle.locationLng})
+                        |Private: ${circle.private}""".trimMargin())
+                    
+                    circle
                 } catch (e: Exception) {
+                    Log.e(TAG, "Error converting document to Circle: ${e.message}", e)
                     null
                 }
             }
-            
-            
+
+            Log.d(TAG, "Found ${circles.size} circles in total")
             Result.success(circles)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting nearby circles: ${e.message}", e)

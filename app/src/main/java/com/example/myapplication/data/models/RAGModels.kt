@@ -42,6 +42,20 @@ data class ResponseMessage(
 )
 
 /**
+ * Models for image analysis
+ */
+data class ImageAnalysis(
+    val objects: List<String> = emptyList(),
+    val scenes: List<String> = emptyList(),
+    val actions: List<String> = emptyList(),
+    val emotions: List<String> = emptyList(),
+    val dominantColors: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val confidence: Double = 0.0,
+    val generatedAt: Timestamp = Timestamp.now()
+)
+
+/**
  * Models for RAG-specific functionality
  */
 
@@ -53,7 +67,19 @@ data class CircleContext(
     val memberCount: Int,
     val isPrivate: Boolean,
     val activityPatterns: ActivityPatterns,
-    val contentClusters: List<ContentCluster>
+    val contentClusters: List<ContentCluster>,
+    val imageAnalytics: ImageAnalytics? = null
+)
+
+data class ImageAnalytics(
+    val commonObjects: Map<String, Int> = emptyMap(), // Object -> frequency
+    val commonScenes: Map<String, Int> = emptyMap(), // Scene -> frequency
+    val commonEmotions: Map<String, Int> = emptyMap(), // Emotion -> frequency
+    val commonActions: Map<String, Int> = emptyMap(), // Action -> frequency
+    val dominantColors: Map<String, Int> = emptyMap(), // Color -> frequency
+    val topTags: List<String> = emptyList(),
+    val totalImagesAnalyzed: Int = 0,
+    val lastUpdated: Timestamp = Timestamp.now()
 )
 
 data class ActivityPatterns(
@@ -80,14 +106,16 @@ data class ContentCluster(
     val dominantMediaType: String,
     val commonThemes: List<String>,
     val topContributors: List<String>,
-    val engagement: EngagementMetrics
+    val engagement: EngagementMetrics,
+    val imageAnalysis: ImageAnalytics? = null
 )
 
 data class EngagementMetrics(
-    val totalViews: Int,
-    val totalReactions: Int,
-    val averageViewsPerSnap: Double,
-    val averageReactionsPerSnap: Double
+    val views: Int = 0,
+    val uniqueViewers: Int = 0,
+    val averageViewsPerSnap: Double = 0.0,
+    val viewDuration: Long = 0, // in milliseconds
+    val reactions: Map<String, Int> = emptyMap() // reaction -> count
 )
 
 /**

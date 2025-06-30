@@ -5,9 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
-import com.example.myapplication.data.models.CircleContext
-import com.example.myapplication.data.models.CircleSummary
-import com.example.myapplication.data.models.Snap
+import com.example.myapplication.data.models.*
 import com.example.myapplication.data.services.EmbeddingService
 import com.example.myapplication.data.services.OpenAIRAGService
 import com.google.firebase.firestore.FirebaseFirestore
@@ -24,7 +22,7 @@ class RAGRepository {
     private val firestore = FirebaseFirestore.getInstance()
     
     /**
-     * Generates and stores a caption for a snap using RAG
+     * Generates and stores a caption for a snap using RAG, including image analysis
      */
     suspend fun generateAndStoreSnapCaption(
         snap: Snap,
@@ -35,21 +33,46 @@ class RAGRepository {
             // Convert image to base64
             val imageBase64 = convertImageToBase64(imageUri, context)
             
+            // First analyze the image
+            val imageAnalysis = ragService.analyzeImage(imageBase64).getOrNull()
+            
             // Generate caption
             val captionResult = ragService.generateImageCaption(imageBase64)
             
             if (captionResult.isSuccess) {
-                // Update snap with RAG caption
+                // Update snap with RAG caption and image analysis
                 val caption = captionResult.getOrNull()
                 val snapRef = firestore.collection("snaps").document(snap.id)
                 
-                val updates = mapOf(
-                    "ragGeneratedCaption" to caption,
+                val updates = mutableMapOf<String, Any>(
+                    "ragGeneratedCaption" to (caption ?: ""),
                     "ragCaptionGenerated" to true,
                     "ragCaptionGeneratedAt" to Timestamp.now()
                 )
                 
+                // Add image analysis tags if available
+                if (imageAnalysis != null) {
+                    val tags = mutableListOf<String>()
+                    
+                    // Add prefixed tags for better categorization
+                    imageAnalysis.objects.forEach { tags.add("object:$it") }
+                    imageAnalysis.scenes.forEach { tags.add("scene:$it") }
+                    imageAnalysis.emotions.forEach { tags.add("emotion:$it") }
+                    imageAnalysis.actions.forEach { tags.add("action:$it") }
+                    imageAnalysis.dominantColors.forEach { tags.add("color:$it") }
+                    tags.addAll(imageAnalysis.tags)
+                    
+                    updates["ragTags"] = tags
+                    updates["imageAnalysis"] = imageAnalysis
+                }
+                
                 snapRef.update(updates).await()
+                
+                // Update circle analytics if this is a circle snap
+                snap.circleId?.let { circleId ->
+                    updateCircleImageAnalytics(circleId, imageAnalysis)
+                }
+                
                 Result.success(caption ?: "")
             } else {
                 captionResult
@@ -57,6 +80,67 @@ class RAGRepository {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+    
+    /**
+     * Updates the circle's image analytics with new image analysis data
+     */
+    private suspend fun updateCircleImageAnalytics(circleId: String, imageAnalysis: ImageAnalysis?) {
+        if (imageAnalysis == null) return
+        
+        try {
+            val circleRef = firestore.collection("circles").document(circleId)
+            val circleDoc = circleRef.get().await()
+            
+            if (!circleDoc.exists()) return
+            
+            // Get existing analytics or create new ones
+            val existingAnalytics = circleDoc.get("imageAnalytics") as? Map<String, Any>
+            val currentAnalytics = if (existingAnalytics != null) {
+                ImageAnalytics(
+                    commonObjects = (existingAnalytics["commonObjects"] as? Map<String, Int>) ?: emptyMap(),
+                    commonScenes = (existingAnalytics["commonScenes"] as? Map<String, Int>) ?: emptyMap(),
+                    commonEmotions = (existingAnalytics["commonEmotions"] as? Map<String, Int>) ?: emptyMap(),
+                    commonActions = (existingAnalytics["commonActions"] as? Map<String, Int>) ?: emptyMap(),
+                    dominantColors = (existingAnalytics["dominantColors"] as? Map<String, Int>) ?: emptyMap(),
+                    topTags = (existingAnalytics["topTags"] as? List<String>) ?: emptyList(),
+                    totalImagesAnalyzed = (existingAnalytics["totalImagesAnalyzed"] as? Int) ?: 0
+                )
+            } else {
+                ImageAnalytics()
+            }
+            
+            // Update frequency maps with proper type inference
+            val updatedAnalytics = ImageAnalytics(
+                commonObjects = updateFrequencyMap(currentAnalytics.commonObjects, imageAnalysis.objects),
+                commonScenes = updateFrequencyMap(currentAnalytics.commonScenes, imageAnalysis.scenes),
+                commonEmotions = updateFrequencyMap(currentAnalytics.commonEmotions, imageAnalysis.emotions),
+                commonActions = updateFrequencyMap(currentAnalytics.commonActions, imageAnalysis.actions),
+                dominantColors = updateFrequencyMap(currentAnalytics.dominantColors, imageAnalysis.dominantColors),
+                topTags = imageAnalysis.tags.groupingBy { it }.eachCount()
+                    .entries.sortedByDescending { it.value }
+                    .take(20)
+                    .map { it.key },
+                totalImagesAnalyzed = currentAnalytics.totalImagesAnalyzed + 1,
+                lastUpdated = Timestamp.now()
+            )
+            
+            // Update circle document
+            circleRef.update("imageAnalytics", updatedAnalytics).await()
+        } catch (e: Exception) {
+            println("Failed to update circle image analytics: ${e.message}")
+        }
+    }
+    
+    /**
+     * Updates a frequency map with new items
+     */
+    private fun updateFrequencyMap(current: Map<String, Int>, new: List<String>): Map<String, Int> {
+        val mutableMap = current.toMutableMap()
+        new.forEach { item -> 
+            mutableMap[item] = (mutableMap[item] ?: 0) + 1
+        }
+        return mutableMap
     }
     
     /**
@@ -103,12 +187,8 @@ class RAGRepository {
         return Base64.encodeToString(imageBytes, Base64.DEFAULT)
     }
     
-    suspend fun getCircleContext(circleId: String): Result<CircleContext> {
-        return ragService.retrieveCircleContext(circleId)
-    }
-    
     suspend fun findSimilarSnaps(snap: Snap): Result<List<Snap>> {
-        return embeddingService.findSimilarSnaps(snap)
+        return ragService.findRelatedContent(snap)
     }
     
     suspend fun generateSnapEmbedding(snap: Snap): Result<List<Float>> {

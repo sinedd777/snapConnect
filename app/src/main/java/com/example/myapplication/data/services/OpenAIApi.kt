@@ -13,6 +13,12 @@ import retrofit2.http.POST
  */
 interface OpenAIApi {
     @POST("v1/chat/completions")
+    suspend fun analyzeImage(
+        @Body request: OpenAIRequest,
+        @Header("Authorization") authorization: String = "Bearer ${BuildConfig.OPENAI_API_KEY}"
+    ): Response<OpenAIResponse>
+
+    @POST("v1/chat/completions")
     suspend fun generateCaption(
         @Body request: OpenAIRequest,
         @Header("Authorization") authorization: String = "Bearer ${BuildConfig.OPENAI_API_KEY}"
