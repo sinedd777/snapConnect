@@ -155,16 +155,6 @@ fun CircleDetailScreen(
                 }
             )
         },
-        floatingActionButton = {
-            if (viewModel.isMember) {
-                FloatingActionButton(
-                    onClick = { onCaptureForCircle(circleId) },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = "Take Photo")
-                }
-            }
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Box(
@@ -418,21 +408,15 @@ fun CircleSummarySection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Edit Circle Summary")
-                    if (isGeneratingSummary) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
+                    Text("Generate Circle Summary")
+                    IconButton(onClick = onGenerateSummary) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = "Regenerate Summary",
+                            tint = MaterialTheme.colorScheme.primary
                         )
-                    } else {
-                        IconButton(onClick = onGenerateSummary) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = "Regenerate Summary",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
                     }
+                
                 }
             },
             text = {
@@ -521,62 +505,65 @@ fun CircleSummarySection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            } else if (circle.ragSummary != null) {
-                Text(
-                    text = circle.ragSummary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                
-                if (circle.ragHighlights.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Highlights",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    circle.ragHighlights.forEach { highlight ->
-                        Row(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "•",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = highlight,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-                
-                if (circle.ragSummaryGeneratedAt != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Last updated: ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(circle.ragSummaryGeneratedAt.toDate())}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "No summary yet",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    if (circle.ragSummary != null) {
+                        Text(
+                            text = circle.ragSummary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        if (circle.ragHighlights.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Highlights",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            circle.ragHighlights.forEach { highlight ->
+                                Row(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "•",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = highlight,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        
+                        if (circle.ragSummaryGeneratedAt != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Last updated: ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(circle.ragSummaryGeneratedAt.toDate())}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    } else {
+                        Text(
+                            text = "No summary yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     Button(onClick = onGenerateSummary) {
-                        Text("Generate Summary")
+                        Text(if (circle.ragSummary != null) "Regenerate Summary" else "Generate Summary")
                     }
                 }
             }

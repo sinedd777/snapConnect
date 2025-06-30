@@ -71,11 +71,6 @@ class CircleDetailViewModel : ViewModel() {
                     
                     // Load member details
                     loadMembers()
-                    
-                    // Automatically generate summary if needed
-                    if (circle?.ragSummary == null || circle?.ragSummaryGeneratedAt == null) {
-                        generateCircleSummary()
-                    }
                 } else {
                     errorMessage = circleResult.exceptionOrNull()?.message ?: "Failed to load circle"
                 }
