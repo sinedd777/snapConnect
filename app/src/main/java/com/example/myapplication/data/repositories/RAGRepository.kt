@@ -148,25 +148,65 @@ class RAGRepository {
      */
     suspend fun generateAndStoreCircleSummary(circleId: String): Result<CircleSummary> {
         return try {
-            // Generate complete summary using the service
-            val summaryResult = ragService.generateCompleteSummary(circleId)
+            // Get snaps using SnapRepository to ensure proper sender names
+            val snapRepository = SnapRepository()
+            val snapsResult = snapRepository.getSnapsForCircle(circleId)
             
-            if (summaryResult.isSuccess) {
-                val circleSummary = summaryResult.getOrNull()!!
-                
-                // Update circle with summary
-                val circleRef = firestore.collection("circles").document(circleId)
-                val updates = mapOf(
-                    "ragSummary" to circleSummary.summary,
-                    "ragHighlights" to circleSummary.highlights,
-                    "ragSummaryGeneratedAt" to circleSummary.generatedAt
-                )
-                
-                circleRef.update(updates).await()
-                Result.success(circleSummary)
-            } else {
-                summaryResult
+            if (snapsResult.isFailure) {
+                return Result.failure(snapsResult.exceptionOrNull() ?: Exception("Failed to get snaps"))
             }
+            
+            val snaps = snapsResult.getOrNull() ?: emptyList()
+            
+            // Generate summary using the snaps with proper sender names
+            val summary = ragService.summarizeCircleContent(snaps).getOrNull() ?: ""
+            val highlights = ragService.generateCircleHighlights(circleId).getOrNull() ?: emptyList()
+            
+            // Extract common themes from RAG tags
+            val themes = snaps
+                .flatMap { it.ragTags }
+                .groupingBy { it }
+                .eachCount()
+                .entries
+                .sortedByDescending { it.value }
+                .take(5)
+                .map { it.key }
+            
+            // Get top contributors with proper names
+            val topContributors = snaps
+                .groupBy { it.sender }
+                .entries
+                .sortedByDescending { (_, snaps) -> snaps.size }
+                .take(3)
+                .mapNotNull { (_, snaps) -> snaps.firstOrNull()?.senderName }
+                .filter { it != null }
+            
+            val circleSummary = CircleSummary(
+                circleId = circleId,
+                summary = summary,
+                highlights = highlights,
+                themes = themes,
+                topContributors = topContributors,
+                activityInsights = buildString {
+                    append("Activity Overview:\n")
+                    append("- Total snaps: ${snaps.size}\n")
+                    append("- Total views: ${snaps.sumOf { it.viewedBy.size }}\n")
+                    append("- Total saves: ${snaps.sumOf { it.screenshotBy.size }}\n")
+                    append("- Unique contributors: ${snaps.map { it.sender }.distinct().size}")
+                },
+                generatedAt = Timestamp.now()
+            )
+            
+            // Update circle with summary
+            val circleRef = firestore.collection("circles").document(circleId)
+            val updates = mapOf(
+                "ragSummary" to circleSummary.summary,
+                "ragHighlights" to circleSummary.highlights,
+                "ragSummaryGeneratedAt" to circleSummary.generatedAt
+            )
+            
+            circleRef.update(updates).await()
+            Result.success(circleSummary)
         } catch (e: Exception) {
             Result.failure(e)
         }

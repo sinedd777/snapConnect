@@ -279,17 +279,6 @@ fun HomeScreen(
                 }
             }
         },
-        floatingActionButton = {
-            if (!isMapFullscreen) {
-                FloatingActionButton(
-                    onClick = onCreateCircle,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Circle")
-                }
-            }
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(

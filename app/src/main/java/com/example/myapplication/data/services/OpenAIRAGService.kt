@@ -253,26 +253,41 @@ class OpenAIRAGService : RAGService {
     override suspend fun generateCircleHighlights(circleId: String): Result<List<String>> {
         return try {
             val snaps = getSnapsForCircle(circleId)
+            
+            // If no snaps, return empty list
+            if (snaps.isEmpty()) {
+                return Result.success(emptyList())
+            }
+            
             val highlights = mutableListOf<String>()
             
             // Most viewed content
-            val mostViewed = snaps.maxByOrNull { snap: Snap -> snap.viewedBy.size }
+            val mostViewed = snaps.maxByOrNull { it.viewedBy.size }
             if (mostViewed != null) {
-                highlights.add("Most viewed: ${mostViewed.ragGeneratedCaption ?: mostViewed.caption ?: "No caption"} (${mostViewed.viewedBy.size} views)")
+                val caption = mostViewed.ragGeneratedCaption ?: mostViewed.caption ?: "No caption"
+                val senderName = mostViewed.senderName ?: "Unknown"
+                highlights.add("Most viewed: $caption by $senderName (${mostViewed.viewedBy.size} views)")
             }
             
             // Most screenshot content
-            val mostScreenshot = snaps.maxByOrNull { snap: Snap -> snap.screenshotBy.size }
+            val mostScreenshot = snaps.maxByOrNull { it.screenshotBy.size }
             if (mostScreenshot != null && mostScreenshot.screenshotBy.isNotEmpty()) {
-                highlights.add("Most saved: ${mostScreenshot.ragGeneratedCaption ?: mostScreenshot.caption ?: "No caption"} (${mostScreenshot.screenshotBy.size} saves)")
+                val caption = mostScreenshot.ragGeneratedCaption ?: mostScreenshot.caption ?: "No caption"
+                val senderName = mostScreenshot.senderName ?: "Unknown"
+                highlights.add("Most saved: $caption by $senderName (${mostScreenshot.screenshotBy.size} saves)")
             }
             
-            // Most active contributor
-            val userSnaps = snaps.groupBy { snap: Snap -> snap.sender }
-            val mostActive = userSnaps.maxByOrNull { (_, snaps): Map.Entry<String, List<Snap>> -> snaps.size }
-            if (mostActive != null) {
-                val username = mostActive.value.firstOrNull()?.senderName ?: "Unknown"
-                highlights.add("Most active: $username with ${mostActive.value.size} snaps")
+            // Most active contributors
+            val topContributors = snaps
+                .groupBy { it.sender }
+                .entries
+                .sortedByDescending { (_, snaps) -> snaps.size }
+                .take(3)
+                .mapNotNull { (_, snaps) -> snaps.firstOrNull()?.senderName }
+                .filter { it != "Unknown" }
+            
+            if (topContributors.isNotEmpty()) {
+                highlights.add("Top contributors: ${topContributors.joinToString(", ")}")
             }
             
             Result.success(highlights)
@@ -293,8 +308,8 @@ class OpenAIRAGService : RAGService {
             
             // Extract common themes from RAG tags
             val themes = snaps
-                .flatMap { snap: Snap -> snap.ragTags }
-                .groupingBy { tag: String -> tag }
+                .flatMap { it.ragTags }
+                .groupingBy { it }
                 .eachCount()
                 .entries
                 .sortedByDescending { it.value }
@@ -303,19 +318,20 @@ class OpenAIRAGService : RAGService {
             
             // Get top contributors
             val topContributors = snaps
-                .groupBy { snap: Snap -> snap.sender }
+                .groupBy { it.sender }
                 .entries
-                .sortedByDescending { (_, snaps): Map.Entry<String, List<Snap>> -> snaps.size }
+                .sortedByDescending { (_, snaps) -> snaps.size }
                 .take(3)
-                .map { (_, snaps): Map.Entry<String, List<Snap>> -> snaps.firstOrNull()?.senderName ?: "Unknown" }
+                .mapNotNull { (_, snaps) -> snaps.firstOrNull()?.senderName }
+                .filter { it != null }
             
             // Generate activity insights
             val activityInsights = buildString {
                 append("Activity Overview:\n")
                 append("- Total snaps: ${snaps.size}\n")
-                append("- Total views: ${snaps.sumOf { snap: Snap -> snap.viewedBy.size }}\n")
-                append("- Total saves: ${snaps.sumOf { snap: Snap -> snap.screenshotBy.size }}\n")
-                append("- Unique contributors: ${snaps.map { snap: Snap -> snap.sender }.distinct().size}")
+                append("- Total views: ${snaps.sumOf { it.viewedBy.size }}\n")
+                append("- Total saves: ${snaps.sumOf { it.screenshotBy.size }}\n")
+                append("- Unique contributors: ${snaps.map { it.sender }.distinct().size}")
             }
             
             Result.success(CircleSummary(
@@ -407,14 +423,26 @@ class OpenAIRAGService : RAGService {
                 .get()
                 .await()
             
-            snapshots.documents.mapNotNull { doc ->
+            val snaps = snapshots.documents.mapNotNull { doc ->
                 val data = doc.data
                 if (data != null) {
                     val snapData = data.toMutableMap()
                     snapData["id"] = doc.id
+                    
+                    // Get sender name
+                    val senderId = data["sender"] as? String
+                    if (senderId != null) {
+                        val userDoc = firestore.collection("users").document(senderId).get().await()
+                        val username = userDoc.get("username") as? String
+                        val email = userDoc.get("email") as? String
+                        snapData["senderName"] = username ?: email ?: "Unknown"
+                    }
+                    
                     Snap.fromMap(snapData)
                 } else null
             }
+            
+            snaps
         } catch (e: Exception) {
             emptyList()
         }
