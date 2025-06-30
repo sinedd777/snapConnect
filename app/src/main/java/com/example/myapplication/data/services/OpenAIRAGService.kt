@@ -141,82 +141,95 @@ class OpenAIRAGService : RAGService {
     }
     
     override suspend fun summarizeCircleContent(snaps: List<Snap>): Result<String> {
-        // Return early if no snaps
-        if (snaps.isEmpty()) {
-            return Result.success("")
+        // Get circle info to make a friendly message
+        val circle = snaps.firstOrNull()?.circleId?.let { circleId ->
+            firestore.collection("circles").document(circleId).get().await()
+        }
+        
+        val circleName = circle?.get("name") as? String ?: "this circle"
+        val circleDescription = circle?.get("description") as? String
+
+        // If no snaps or minimal content, just make a fun one-liner about the circle
+        if (snaps.isEmpty() || snaps.all { it.caption == null && it.ragGeneratedCaption == null }) {
+            val request = OpenAIRequest(
+                model = "gpt-4",
+                messages = listOf(
+                    Message(
+                        role = "user",
+                        content = """Write a short, natural tagline for an event/group named "$circleName"${if (circleDescription != null) " (${circleDescription})" else ""}. 
+                            |Guidelines:
+                            |- Keep it under 10 words
+                            |- Make it sound like a natural event/group tagline
+                            |- No personification of the circle
+                            |- No mentions of content/data
+                            |- Add an appropriate emoji at the start
+                            |
+                            |Examples:
+                            |- 🎭 Where drama meets destiny on stage!
+                            |- 🎨 Bringing color to campus, one brush at a time
+                            |- 🏃 Sprint, score, celebrate - that's how we roll""".trimMargin()
+                    )
+                )
+            )
+            
+            val response = api.generateSummary(request)
+            return if (response.isSuccessful) {
+                val summary = response.body()?.choices?.firstOrNull()?.message?.content
+                if (summary != null) {
+                    Result.success(summary.trim())
+                } else {
+                    Result.success("⭐ Where moments become memories!")
+                }
+            } else {
+                Result.success("⭐ Where moments become memories!")
+            }
         }
 
+        // For circles with actual content
         return try {
-            // First, analyze images from snaps to generate factoids
-            val imageAnalyses = snaps.mapNotNull { snap: Snap ->
-                // Get existing image analysis from the snap
-                val imageAnalysis = snap.imageAnalysis
-                if (imageAnalysis != null) {
-                    Result.success(imageAnalysis)
-                } else {
-                    null
-                }
-            }
-
-            // If we have image analyses, use them to enrich our summary
-            val imageContext = if (imageAnalyses.isNotEmpty()) {
-                val commonObjects = imageAnalyses
-                    .mapNotNull { it.getOrNull() }
-                    .flatMap { analysis: ImageAnalysis -> analysis.objects }
-                    .groupingBy { obj: String -> obj }
+            val imageContext = if (snaps.any { it.imageAnalysis != null }) {
+                val analyses = snaps.mapNotNull { it.imageAnalysis }
+                val commonEmotions = analyses
+                    .flatMap { it.emotions }
+                    .groupingBy { it }
                     .eachCount()
-                    .entries
-                    .sortedByDescending { it.value }
-                    .take(3)
-                    .map { it.key }
-
-                val commonEmotions = imageAnalyses
-                    .mapNotNull { it.getOrNull() }
-                    .flatMap { analysis: ImageAnalysis -> analysis.emotions }
-                    .groupingBy { emotion: String -> emotion }
+                    .maxByOrNull { it.value }
+                    ?.key
+                
+                val commonScenes = analyses
+                    .flatMap { it.scenes }
+                    .groupingBy { it }
                     .eachCount()
-                    .entries
-                    .sortedByDescending { it.value }
-                    .firstOrNull()?.key
+                    .maxByOrNull { it.value }
+                    ?.key
 
-                val commonScenes = imageAnalyses
-                    .mapNotNull { it.getOrNull() }
-                    .flatMap { analysis: ImageAnalysis -> analysis.scenes }
-                    .groupingBy { scene: String -> scene }
-                    .eachCount()
-                    .entries
-                    .sortedByDescending { it.value }
-                    .firstOrNull()?.key
-
-                """Based on the images shared:
-                   |${if (commonScenes != null) "- This appears to be taking place in a $commonScenes" else ""}
-                   |${if (commonEmotions != null) "- The overall mood seems $commonEmotions" else ""}
-                   |${if (commonObjects.isNotEmpty()) "- Common elements include: ${commonObjects.joinToString(", ")}" else ""}
-                   |
-                   |""".trimMargin()
+                if (commonEmotions != null || commonScenes != null) {
+                    "Vibe: ${listOfNotNull(commonEmotions, commonScenes).joinToString(" in ")}"
+                } else ""
             } else ""
-
-            // Build snap summaries as before
-            val snapSummaries = snaps.map { snap: Snap ->
-                buildString {
-                    append("- ${snap.senderName ?: "Unknown"}: ")
-                    append(snap.ragGeneratedCaption ?: snap.caption ?: "No caption")
-                    append(" (${snap.viewedBy.size} views)")
-                }
-            }.joinToString("\n")
 
             val request = OpenAIRequest(
                 model = "gpt-4",
                 messages = listOf(
                     Message(
                         role = "user",
-                        content = """Generate a concise summary of this circle's content:
+                        content = """Write a short, natural tagline for this group/event:
                             |
-                            |$imageContext
-                            |$snapSummaries
+                            |Name: $circleName
+                            |${if (circleDescription != null) "Description: $circleDescription\n" else ""}
+                            |${if (imageContext.isNotEmpty()) "$imageContext\n" else ""}
                             |
-                            |Focus on common themes, notable moments, and overall activity. If there's image analysis available,
-                            |incorporate those insights naturally into the summary.""".trimMargin()
+                            |Guidelines:
+                            |- Keep it under 10 words
+                            |- Make it sound like a natural event tagline
+                            |- No personification
+                            |- Add an appropriate emoji at the start
+                            |- Focus on the event/group theme
+                            |
+                            |Examples:
+                            |- 🎭 Where drama meets destiny on stage!
+                            |- 🎨 Bringing color to campus, one brush at a time
+                            |- 🏃 Sprint, score, celebrate - that's how we roll""".trimMargin()
                     )
                 )
             )
@@ -227,13 +240,13 @@ class OpenAIRAGService : RAGService {
                 if (summary != null) {
                     Result.success(summary.trim())
                 } else {
-                    Result.failure(Exception("Failed to generate summary"))
+                    Result.success("⚡ ${circleName}: Where the action happens!")
                 }
             } else {
-                Result.failure(Exception("Failed to generate summary: ${response.errorBody()?.string()}"))
+                Result.success("⚡ ${circleName}: Where the action happens!")
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.success("⚡ ${circleName}: Where the action happens!")
         }
     }
     
