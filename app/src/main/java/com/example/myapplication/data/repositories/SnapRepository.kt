@@ -333,9 +333,23 @@ class SnapRepository {
             val snapData = snapDoc.data
                 ?: return Result.failure(IllegalStateException("Snap data is null"))
                 
-            // Check if user is a recipient
+            // Check if user is a recipient or a member of the circle
             val recipients = snapData["recipients"] as? List<String> ?: listOf()
-            if (!recipients.contains(uid)) {
+            val circleId = snapData["circleId"] as? String
+            
+            // If it's a circle snap, check circle membership
+            if (circleId != null) {
+                val circleDoc = firestore.collection("circles").document(circleId).get().await()
+                if (circleDoc.exists()) {
+                    val members = circleDoc.get("members") as? List<String> ?: listOf()
+                    if (members.contains(uid)) {
+                        // User is a circle member, allow access
+                    } else if (!recipients.contains(uid)) {
+                        return Result.failure(IllegalStateException("Not authorized to view this snap"))
+                    }
+                }
+            } else if (!recipients.contains(uid)) {
+                // Not a circle snap and user is not a recipient
                 return Result.failure(IllegalStateException("Not authorized to view this snap"))
             }
             

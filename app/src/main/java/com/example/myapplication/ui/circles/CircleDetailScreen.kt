@@ -422,14 +422,15 @@ fun CircleSummarySection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Generate Circle Summary")
-                    IconButton(onClick = onGenerateSummary) {
-                        Icon(
-                            Icons.Default.AutoAwesome,
-                            contentDescription = "Regenerate Summary",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    if (isCreator) {
+                        IconButton(onClick = onGenerateSummary) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = "Regenerate Summary",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                
                 }
             },
             text = {
@@ -575,8 +576,10 @@ fun CircleSummarySection(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
-                    Button(onClick = onGenerateSummary) {
-                        Text(if (circle.ragSummary != null) "Regenerate Summary" else "Generate Summary")
+                    if (isCreator) {
+                        Button(onClick = onGenerateSummary) {
+                            Text(if (circle.ragSummary != null) "Regenerate Summary" else "Generate Summary")
+                        }
                     }
                 }
             }

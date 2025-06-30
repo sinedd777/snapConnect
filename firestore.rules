@@ -71,10 +71,14 @@ service cloud.firestore {
     
     // Snap docs
     match /snaps/{snapId} {
-      // Allow read if the user is the sender or a recipient
-      allow read: if request.auth != null && 
-                   (resource.data.sender == request.auth.uid || 
-                    request.auth.uid in resource.data.recipients);
+      // Allow read if the user is the sender, a recipient, or a member of the circle the snap was shared in
+      allow read: if request.auth != null && (
+                   resource.data.sender == request.auth.uid || 
+                   request.auth.uid in resource.data.recipients ||
+                   (resource.data.circleId != null && 
+                    exists(/databases/$(db)/documents/circles/$(resource.data.circleId)) &&
+                    request.auth.uid in get(/databases/$(db)/documents/circles/$(resource.data.circleId)).data.members)
+                 );
       
       // Allow creation if the user is the sender
       allow create: if request.auth != null && 
@@ -85,13 +89,6 @@ service cloud.firestore {
                      (resource.data.sender == request.auth.uid || 
                       request.auth.uid in resource.data.recipients);
       
-      // Allow reading individual snaps by circleId if the user is a member of the circle
-      allow get: if request.auth != null && 
-                   resource.data.circleId != null &&
-                   exists(/databases/$(db)/documents/circles/$(resource.data.circleId)) &&
-                   (request.auth.uid in get(/databases/$(db)/documents/circles/$(resource.data.circleId)).data.members ||
-                    get(/databases/$(db)/documents/circles/$(resource.data.circleId)).data.creatorId == request.auth.uid);
-                    
       // Allow any authenticated user to list snaps
       allow list: if request.auth != null;
     }
