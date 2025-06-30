@@ -152,6 +152,19 @@ fun CircleDetailScreen(
                             Icon(Icons.Default.ExitToApp, contentDescription = "Leave Circle")
                         }
                     }
+
+                    if (viewModel.canJoin) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    viewModel.joinCircle()
+                                }
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        ) {
+                            Text("Join Circle")
+                        }
+                    }
                 }
             )
         },

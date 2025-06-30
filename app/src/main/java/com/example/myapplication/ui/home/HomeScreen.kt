@@ -54,6 +54,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.ripple.rememberRipple
+import androidx.navigation.NavController
+import com.example.myapplication.navigation.Destinations
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +67,8 @@ fun HomeScreen(
     onOpenProfile: () -> Unit,
     onCreateCircle: () -> Unit,
     onOpenMap: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    navController: NavController
 ) {
     val TAG = "HomeScreen"
     val snackbarHostState = remember { SnackbarHostState() }
@@ -205,7 +208,8 @@ fun HomeScreen(
     // Function to handle circle selection
     val onOpenCircleDetail = { circleId: String ->
         // Navigate to circle detail screen
-        onOpenSnapViewer(circleId) // For now, reuse the snap viewer navigation
+        onOpenCircles()
+        navController.navigate(Destinations.circleDetail(circleId))
     }
     
     

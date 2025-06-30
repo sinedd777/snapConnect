@@ -464,4 +464,41 @@ class CircleRepository {
         }
     }
     
+    /**
+     * Join a public Circle
+     */
+    suspend fun joinPublicCircle(circleId: String): Result<Unit> {
+        return try {
+            val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
+            
+            // Check if the circle exists and is public
+            val circleResult = getCircleById(circleId)
+            if (circleResult.isFailure) {
+                return Result.failure(circleResult.exceptionOrNull() ?: IllegalStateException("Failed to get circle"))
+            }
+            
+            val circle = circleResult.getOrThrow()
+            
+            // Check if circle is public
+            if (circle.private) {
+                return Result.failure(IllegalStateException("Cannot join a private circle without an invitation"))
+            }
+            
+            // Check if user is already a member
+            if (circle.members.contains(currentUserId)) {
+                return Result.failure(IllegalStateException("You are already a member of this circle"))
+            }
+            
+            // Add user to members
+            firestore.collection(CIRCLES_COLLECTION)
+                .document(circleId)
+                .update("members", FieldValue.arrayUnion(currentUserId))
+                .await()
+                
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
 } 

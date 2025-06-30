@@ -58,6 +58,9 @@ class CircleDetailViewModel : ViewModel() {
         
     val isMember: Boolean
         get() = circle?.members?.contains(auth.currentUser?.uid) == true
+
+    val canJoin: Boolean
+        get() = circle?.let { !it.private && !isMember } ?: false
     
     fun loadCircleDetails(circleId: String) {
         isLoading = true
@@ -397,6 +400,27 @@ class CircleDetailViewModel : ViewModel() {
     fun cancelEditSummary() {
         isEditingSummary = false
         editedSummary = null
+    }
+
+    fun joinCircle() {
+        viewModelScope.launch {
+            try {
+                val circleId = circle?.id ?: return@launch
+                val result = circleRepository.joinPublicCircle(circleId)
+                
+                if (result.isSuccess) {
+                    // Update local state
+                    circle = circle?.copy(
+                        members = circle?.members?.plus(auth.currentUser?.uid ?: "") ?: emptyList()
+                    )
+                    loadMembers()
+                } else {
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to join circle"
+                }
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "An unknown error occurred"
+            }
+        }
     }
 }
 

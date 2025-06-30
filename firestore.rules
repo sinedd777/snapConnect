@@ -107,11 +107,15 @@ service cloud.firestore {
     
     // Circle docs
     match /circles/{circleId} {
-      // Allow read if user is a member or has a pending invitation
+      // Allow read if user is a member, has a pending invitation, or if the circle is public
       allow read: if request.auth != null && (
-                   (resource != null && resource.data != null && 
-                    (request.auth.uid in resource.data.members || 
-                     (resource.data.pendingInvites != null && request.auth.uid in resource.data.pendingInvites)))
+                   (resource != null && resource.data != null && (
+                    // Allow if user is a member or has pending invite
+                    request.auth.uid in resource.data.members || 
+                    (resource.data.pendingInvites != null && request.auth.uid in resource.data.pendingInvites) ||
+                    // Allow if circle is public
+                    resource.data.private == false
+                   ))
                    ||
                    // Allow listing all circles (for queries)
                    request.path.size() == 2
@@ -121,7 +125,7 @@ service cloud.firestore {
       allow create: if request.auth != null && 
                      request.resource.data.creatorId == request.auth.uid;
       
-      // Allow updates if the user is the creator or is accepting/declining an invitation
+      // Allow updates if the user is the creator, is accepting/declining an invitation, or joining a public circle
       allow update: if request.auth != null && (
                      // Creator can update most fields
                      resource.data.creatorId == request.auth.uid ||
@@ -133,7 +137,11 @@ service cloud.firestore {
                      // Invited users can accept/decline invitations
                      (resource.data.pendingInvites != null && 
                       request.auth.uid in resource.data.pendingInvites && 
-                      onlyAcceptingOrDecliningInvitation())
+                      onlyAcceptingOrDecliningInvitation()) ||
+                     
+                     // Allow joining public circles
+                     (resource.data.private == false && 
+                      onlyJoiningPublicCircle())
                    );
       
       // Allow deletion only by the creator
@@ -157,6 +165,15 @@ service cloud.firestore {
         return changedFields.hasOnly(allowedFields) && 
                (request.resource.data.pendingInvites == null || 
                 !request.resource.data.pendingInvites.hasAll([request.auth.uid]));
+      }
+      
+      // Helper function to check if only joining a public circle
+      function onlyJoiningPublicCircle() {
+        let allowedFields = ['members'];
+        let changedFields = request.resource.data.diff(resource.data).affectedKeys();
+        return changedFields.hasOnly(allowedFields) && 
+               !(request.auth.uid in resource.data.members) && // User is not already a member
+               (request.auth.uid in request.resource.data.members); // User is being added as a member
       }
     }
   }

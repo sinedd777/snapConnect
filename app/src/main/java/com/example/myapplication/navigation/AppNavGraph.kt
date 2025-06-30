@@ -84,7 +84,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 },
                 onOpenMap = {
                     navController.navigate(Destinations.MAP)
-                }
+                },
+                navController = navController
             )
         }
         
