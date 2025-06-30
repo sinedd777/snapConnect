@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -202,7 +203,13 @@ fun CircleDetailScreen(
                             CircleSummarySection(
                                 circle = viewModel.circle!!,
                                 isGeneratingSummary = viewModel.isGeneratingSummary,
-                                onGenerateSummary = { viewModel.generateCircleSummary() }
+                                onGenerateSummary = { viewModel.generateCircleSummary() },
+                                isCreator = viewModel.isCreator,
+                                onEditSummary = { viewModel.editCircleSummary() },
+                                isEditingSummary = viewModel.isEditingSummary,
+                                editedSummary = viewModel.editedSummary,
+                                onUpdateSummary = { viewModel.updateCircleSummary(it) },
+                                onCancelEdit = { viewModel.cancelEditSummary() }
                             )
                         }
                         
@@ -391,8 +398,73 @@ fun CircleInfoSection(circle: Circle, memberCount: Int) {
 fun CircleSummarySection(
     circle: Circle,
     isGeneratingSummary: Boolean,
-    onGenerateSummary: () -> Unit
+    onGenerateSummary: () -> Unit,
+    isCreator: Boolean,
+    onEditSummary: () -> Unit,
+    isEditingSummary: Boolean,
+    editedSummary: String?,
+    onUpdateSummary: (String) -> Unit,
+    onCancelEdit: () -> Unit
 ) {
+    // Edit Dialog
+    if (isEditingSummary) {
+        var summaryText by remember { mutableStateOf(editedSummary ?: "") }
+        
+        AlertDialog(
+            onDismissRequest = onCancelEdit,
+            title = { 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Edit Circle Summary")
+                    if (isGeneratingSummary) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(onClick = onGenerateSummary) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = "Regenerate Summary",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            },
+            text = {
+                OutlinedTextField(
+                    value = summaryText,
+                    onValueChange = { summaryText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    label = { Text("Summary") },
+                    enabled = !isGeneratingSummary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onUpdateSummary(summaryText) },
+                    enabled = !isGeneratingSummary
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = onCancelEdit,
+                    enabled = !isGeneratingSummary
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -403,11 +475,32 @@ fun CircleSummarySection(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = "Circle Summary",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Circle Summary",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                if (isCreator) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Edit button
+                        IconButton(onClick = onEditSummary) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit Summary",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
             

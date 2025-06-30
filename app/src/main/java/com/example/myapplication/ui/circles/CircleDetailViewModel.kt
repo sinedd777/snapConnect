@@ -17,6 +17,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.Timestamp
 
 class CircleDetailViewModel : ViewModel() {
     private val circleRepository = CircleRepository()
@@ -44,6 +45,12 @@ class CircleDetailViewModel : ViewModel() {
         private set
 
     var isGeneratingSummary by mutableStateOf(false)
+        private set
+        
+    var isEditingSummary by mutableStateOf(false)
+        private set
+        
+    var editedSummary by mutableStateOf<String?>(null)
         private set
         
     val isCreator: Boolean
@@ -346,6 +353,10 @@ class CircleDetailViewModel : ViewModel() {
                 if (result.isSuccess) {
                     // Refresh circle data to get updated summary
                     loadCircleDetails(circle!!.id)
+                    // If we're in edit mode, update the edited summary
+                    if (isEditingSummary) {
+                        editedSummary = result.getOrNull()?.summary
+                    }
                 } else {
                     errorMessage = result.exceptionOrNull()?.message ?: "Failed to generate summary"
                 }
@@ -355,6 +366,42 @@ class CircleDetailViewModel : ViewModel() {
                 isGeneratingSummary = false
             }
         }
+    }
+
+    fun editCircleSummary() {
+        if (!isCreator) return
+        isEditingSummary = true
+        editedSummary = circle?.ragSummary
+    }
+
+    fun updateCircleSummary(newSummary: String) {
+        if (!isCreator) return
+        viewModelScope.launch {
+            try {
+                val circleId = circle?.id ?: return@launch
+                val result = circleRepository.updateCircle(circleId, mapOf(
+                    "ragSummary" to newSummary,
+                    "ragSummaryGeneratedAt" to Timestamp.now(),
+                    "ragHighlights" to (circle?.ragHighlights ?: emptyList()),
+                    "ragTags" to (circle?.ragTags ?: emptyList()),
+                    "ragContentAnalysis" to (circle?.ragContentAnalysis ?: emptyMap())
+                ))
+                if (result.isSuccess) {
+                    circle = result.getOrNull()
+                    isEditingSummary = false
+                    editedSummary = null
+                } else {
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to update summary"
+                }
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "An unknown error occurred"
+            }
+        }
+    }
+
+    fun cancelEditSummary() {
+        isEditingSummary = false
+        editedSummary = null
     }
 }
 

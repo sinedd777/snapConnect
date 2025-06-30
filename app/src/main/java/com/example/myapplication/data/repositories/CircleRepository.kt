@@ -296,18 +296,9 @@ class CircleRepository {
     }
     
     /**
-     * Update Circle details (creator only)
+     * Update Circle details with a map of fields (creator only)
      */
-    suspend fun updateCircle(
-        circleId: String,
-        name: String? = null,
-        description: String? = null,
-        private: Boolean? = null,
-        locationEnabled: Boolean? = null,
-        locationLat: Double? = null,
-        locationLng: Double? = null,
-        locationRadius: Double? = null
-    ): Result<Circle> {
+    suspend fun updateCircle(circleId: String, updates: Map<String, Any>): Result<Circle> {
         return try {
             val currentUserId = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not authenticated"))
             
@@ -320,20 +311,6 @@ class CircleRepository {
             val circle = circleResult.getOrThrow()
             if (circle.creatorId != currentUserId) {
                 return Result.failure(IllegalStateException("Only the creator can update this circle"))
-            }
-            
-            // Build update map with only non-null fields
-            val updates = mutableMapOf<String, Any>()
-            name?.let { updates["name"] = it }
-            description?.let { updates["description"] = it }
-            private?.let { updates["private"] = it }
-            locationEnabled?.let { updates["locationEnabled"] = it }
-            locationLat?.let { updates["locationLat"] = it }
-            locationLng?.let { updates["locationLng"] = it }
-            locationRadius?.let { updates["locationRadius"] = it }
-            
-            if (updates.isEmpty()) {
-                return Result.success(circle)
             }
             
             // Update the circle
