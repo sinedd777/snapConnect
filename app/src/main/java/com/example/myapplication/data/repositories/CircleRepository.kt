@@ -442,67 +442,22 @@ class CircleRepository {
                 return Result.failure(IllegalStateException("User not authenticated"))
             }
             
-            // Convert radius to meters
-            val radiusInM = radiusKm * 1000
+            Log.d(TAG, "Fetching all circles for debugging...")
             
-            // Get the geohash query bounds
-            val center = GeoLocation(lat, lng)
-            val bounds = GeoFireUtils.getGeoHashQueryBounds(center, radiusInM)
-            
-            
-            // First, let's check how many total circles exist
-            val totalCircles = firestore.collection(CIRCLES_COLLECTION).get().await()
-            
-            
-            // Create a list to hold all query tasks
-            val tasks = bounds.map { bound ->
-                firestore.collection(CIRCLES_COLLECTION)
-                    .whereEqualTo("private", false)  // Only get public circles
-                    .orderBy("geohash")
-                    .startAt(bound.startHash)
-                    .endAt(bound.endHash)
-                    .get()
-            }.toMutableList()
-            
-            // Add an additional query for public circles without location
-            tasks.add(
-                firestore.collection(CIRCLES_COLLECTION)
-                    .whereEqualTo("private", false)
-                    .whereEqualTo("locationEnabled", false)
-                    .get()
-            )
-            
-            // Wait for all queries to complete
-            val snapshots = tasks.map { it.await() }
+            // Simple query to get all circles
+            val snapshot = firestore.collection(CIRCLES_COLLECTION)
+                .get()
+                .await()
             
             // Log raw results
-            snapshots.forEachIndexed { index, snapshot ->
-                snapshot.documents.forEach { doc ->
-                    Log.d(TAG, """Raw document:
-                        |ID: ${doc.id}
-                        |Data: ${doc.data}""".trimMargin())
-                }
+            snapshot.documents.forEach { doc ->
+                Log.d(TAG, """Raw document:
+                    |ID: ${doc.id}
+                    |Data: ${doc.data}""".trimMargin())
             }
             
-            // Merge results and filter by actual distance
-            val matchingDocs = snapshots.flatMap { snapshot ->
-                snapshot.documents.filter { doc ->
-                    val lat = doc.getDouble("locationLat")
-                    val lng = doc.getDouble("locationLng")
-                    val locationEnabled = doc.getBoolean("locationEnabled") ?: true
-
-                    // Include the circle if:
-                    // 1. Location is not enabled (it's a public circle without location)
-                    // 2. OR if location is enabled and within radius
-                    !locationEnabled || (lat != null && lng != null && GeoFireUtils.getDistanceBetween(
-                        GeoLocation(lat, lng),
-                        center
-                    ) <= radiusInM)
-                }
-            }.distinctBy { it.id } // Remove any duplicates
-
-            // Convert to Circle objects and log for debugging
-            val circles = matchingDocs.mapNotNull { doc ->
+            // Convert to Circle objects
+            val circles = snapshot.documents.mapNotNull { doc ->
                 try {
                     val data = doc.data?.plus(mapOf("id" to doc.id)) ?: return@mapNotNull null
                     val circle = Circle.fromMap(data)
@@ -513,7 +468,9 @@ class CircleRepository {
                         |Name: ${circle.name}
                         |Location enabled: ${circle.locationEnabled}
                         |Location: (${circle.locationLat}, ${circle.locationLng})
-                        |Private: ${circle.private}""".trimMargin())
+                        |Private: ${circle.private}
+                        |Creator: ${circle.creatorId}
+                        |Members: ${circle.members}""".trimMargin())
                     
                     circle
                 } catch (e: Exception) {
@@ -525,7 +482,7 @@ class CircleRepository {
             Log.d(TAG, "Found ${circles.size} circles in total")
             Result.success(circles)
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting nearby circles: ${e.message}", e)
+            Log.e(TAG, "Error getting circles: ${e.message}", e)
             Result.failure(e)
         }
     }
